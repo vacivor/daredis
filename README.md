@@ -527,6 +527,11 @@ dart analyze
 dart test
 ```
 
+## License
+
+This project is licensed under the MIT License. See
+`LICENSE`.
+
 ## Current Design Notes
 
 - `Daredis` is the top-level single-node client
