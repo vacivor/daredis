@@ -1,7 +1,8 @@
 name: daredis
-description: A starting point for Dart libraries or applications.
+description: A Redis client for Dart with connection pooling, cluster support, dedicated Pub/Sub and transaction sessions, and typed helper APIs.
 version: 0.0.1
-# repository: https://github.com/my_org/my_repo
+repository: https://github.com/vacivor/daredis
+issue_tracker: https://github.com/vacivor/daredis/issues
 
 environment:
   sdk: ^3.10.7

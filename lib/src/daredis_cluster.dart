@@ -3,6 +3,70 @@ import 'package:daredis/src/exceptions.dart';
 
 import '../daredis.dart';
 
+class ClusterRedirect {
+  final int slot;
+  final ClusterNodeAddress address;
+  final bool isMoved;
+
+  const ClusterRedirect({
+    required this.slot,
+    required this.address,
+    required this.isMoved,
+  });
+}
+
+ClusterNodeAddress? parseClusterNodeAddress(String value) {
+  if (value.startsWith('[')) {
+    final endBracket = value.indexOf(']');
+    if (endBracket == -1) return null;
+    final host = value.substring(1, endBracket);
+    final portPart = value.substring(endBracket + 2);
+    final port = int.tryParse(portPart);
+    if (port == null) return null;
+    return ClusterNodeAddress(host, port);
+  }
+
+  final separator = value.lastIndexOf(':');
+  if (separator == -1) return null;
+  final host = value.substring(0, separator);
+  final port = int.tryParse(value.substring(separator + 1));
+  if (port == null) return null;
+  return ClusterNodeAddress(host, port);
+}
+
+ClusterRedirect? parseClusterRedirect(Object error) {
+  final message = error.toString();
+  final movedIndex = message.indexOf('MOVED ');
+  final askIndex = message.indexOf('ASK ');
+  final isMoved = movedIndex != -1;
+  final isAsk = askIndex != -1;
+  if (!isMoved && !isAsk) return null;
+
+  final start = isMoved ? movedIndex : askIndex;
+  final parts = message.substring(start).split(' ');
+  if (parts.length < 3) return null;
+  final slot = int.tryParse(parts[1]) ?? -1;
+  final address = parseClusterNodeAddress(parts[2]);
+  if (address == null || slot < 0) return null;
+  return ClusterRedirect(slot: slot, address: address, isMoved: isMoved);
+}
+
+bool isRetryableClusterError(Object error) {
+  final message = error.toString().toUpperCase();
+  return message.contains('TRYAGAIN') ||
+      message.contains('CLUSTERDOWN') ||
+      message.contains('LOADING');
+}
+
+bool isClusterRoutingError(Object error) {
+  final message = error.toString().toUpperCase();
+  return message.contains('MOVED ') ||
+      message.contains('ASK ') ||
+      message.contains('CLUSTERDOWN') ||
+      message.contains('TRYAGAIN') ||
+      message.contains('CROSSSLOT');
+}
+
 class ClusterNode {
   final String host;
   final int port;
@@ -13,9 +77,14 @@ class ClusterNode {
 class ClusterOptions {
   final List<ClusterNode> seeds;
   final ConnectionOptions connectionOptions;
-  final int poolSize;
+  final int nodePoolSize;
   final int? poolMaxWaiters;
   final Duration? poolAcquireTimeout;
+  final Duration? poolIdleTimeout;
+  final Duration? poolEvictionInterval;
+  final int poolCreateMaxAttempts;
+  final Duration poolCreateRetryDelay;
+  final bool poolUseLifo;
   final int maxRedirects;
   final int maxRetries;
   final Duration retryDelay;
@@ -24,9 +93,14 @@ class ClusterOptions {
   const ClusterOptions({
     required this.seeds,
     this.connectionOptions = const ConnectionOptions(),
-    this.poolSize = 4,
+    this.nodePoolSize = 4,
     this.poolMaxWaiters,
     this.poolAcquireTimeout,
+    this.poolIdleTimeout,
+    this.poolEvictionInterval,
+    this.poolCreateMaxAttempts = 1,
+    this.poolCreateRetryDelay = const Duration(milliseconds: 50),
+    this.poolUseLifo = false,
     this.maxRedirects = 3,
     this.maxRetries = 3,
     this.retryDelay = const Duration(milliseconds: 50),
@@ -34,7 +108,7 @@ class ClusterOptions {
   });
 }
 
-class DaredisCluster extends DaredisBase {
+class DaredisCluster extends RedisClient {
   final ClusterOptions options;
   final Pool<_DaredisClusterConnection> _pool;
   bool _connected = false;
@@ -42,14 +116,19 @@ class DaredisCluster extends DaredisBase {
 
   DaredisCluster({
     required this.options,
-    int poolSize = 4,
+    int clientPoolSize = 4,
     bool testOnBorrow = true,
     bool testOnReturn = false,
   }) : _pool = Pool<_DaredisClusterConnection>(
          config: PoolConfig(
-           maxSize: poolSize,
+           maxSize: clientPoolSize,
            maxWaiters: options.poolMaxWaiters,
            acquireTimeout: options.poolAcquireTimeout,
+           idleTimeout: options.poolIdleTimeout,
+           evictionInterval: options.poolEvictionInterval,
+           createMaxAttempts: options.poolCreateMaxAttempts,
+           createRetryDelay: options.poolCreateRetryDelay,
+           useLifo: options.poolUseLifo,
            testOnBorrow: testOnBorrow,
            testOnReturn: testOnReturn,
          ),
@@ -132,9 +211,16 @@ class DaredisCluster extends DaredisBase {
     await pubsub.connect();
     return pubsub;
   }
+
+  Future<RedisTransaction> openTransaction() {
+    throw DaredisUnsupportedException(
+      'Redis Cluster transactions are not supported by DaredisCluster. '
+      'Use a direct single-node client if you need WATCH/MULTI/EXEC semantics.',
+    );
+  }
 }
 
-class _DaredisClusterConnection extends DaredisBase {
+class _DaredisClusterConnection extends RedisClient {
   final ClusterOptions options;
   final ClusterSlotCache _slotCache = ClusterSlotCache();
   final Map<ClusterNodeAddress, Pool<Connection>> _pools = {};
@@ -186,6 +272,7 @@ class _DaredisClusterConnection extends DaredisBase {
     throw DaredisConnectionException('Unable to connect to any cluster seed');
   }
 
+  @override
   Future<void> close() async {
     _closed = true;
     for (final pool in _pools.values) {
@@ -217,7 +304,7 @@ class _DaredisClusterConnection extends DaredisBase {
         (connection) => connection.sendCommand(command, timeout: timeout),
       );
     } catch (error) {
-      if (_isRetryableError(error) && attempt < options.maxRetries) {
+      if (isRetryableClusterError(error) && attempt < options.maxRetries) {
         await Future.delayed(options.retryDelay);
         return _sendWithRedirect(
           command,
@@ -225,12 +312,12 @@ class _DaredisClusterConnection extends DaredisBase {
           attempt: attempt + 1,
         );
       }
-      final redirect = _parseRedirect(error);
+      final redirect = parseClusterRedirect(error);
       if (redirect == null || attempt >= options.maxRedirects) {
         if (error is DaredisClusterException) {
           rethrow;
         }
-        if (_isClusterError(error)) {
+        if (isClusterRoutingError(error)) {
           throw DaredisClusterException(error.toString());
         }
         rethrow;
@@ -262,9 +349,14 @@ class _DaredisClusterConnection extends DaredisBase {
         );
         return Pool<Connection>(
           config: PoolConfig(
-            maxSize: options.poolSize,
+            maxSize: options.nodePoolSize,
             maxWaiters: options.poolMaxWaiters,
             acquireTimeout: options.poolAcquireTimeout,
+            idleTimeout: options.poolIdleTimeout,
+            evictionInterval: options.poolEvictionInterval,
+            createMaxAttempts: options.poolCreateMaxAttempts,
+            createRetryDelay: options.poolCreateRetryDelay,
+            useLifo: options.poolUseLifo,
             testOnBorrow: true,
             testOnReturn: false,
           ),
@@ -315,9 +407,14 @@ class _DaredisClusterConnection extends DaredisBase {
       );
       return Pool<Connection>(
         config: PoolConfig(
-          maxSize: options.poolSize,
+          maxSize: options.nodePoolSize,
           maxWaiters: options.poolMaxWaiters,
           acquireTimeout: options.poolAcquireTimeout,
+          idleTimeout: options.poolIdleTimeout,
+          evictionInterval: options.poolEvictionInterval,
+          createMaxAttempts: options.poolCreateMaxAttempts,
+          createRetryDelay: options.poolCreateRetryDelay,
+          useLifo: options.poolUseLifo,
         ),
         create: () async {
           final connection = Connection.fromOptions(opts);
@@ -330,10 +427,7 @@ class _DaredisClusterConnection extends DaredisBase {
   }
 
   Future<void> _refreshSlots({ClusterNodeAddress? hint}) async {
-    final candidates = <ClusterNodeAddress>[
-      if (hint != null) hint,
-      ..._pools.keys,
-    ];
+    final candidates = <ClusterNodeAddress>[?hint, ..._pools.keys];
     for (final node in candidates) {
       final pool = _poolForAddress(node);
       try {
@@ -360,69 +454,6 @@ class _DaredisClusterConnection extends DaredisBase {
     if (keys.length <= 1) return;
     ClusterCommandSpec.validateSameSlot(keys, _slotCache);
   }
-
-  _ClusterRedirect? _parseRedirect(Object error) {
-    final message = error.toString();
-    final movedIndex = message.indexOf('MOVED ');
-    final askIndex = message.indexOf('ASK ');
-    final isMoved = movedIndex != -1;
-    final isAsk = askIndex != -1;
-    if (!isMoved && !isAsk) return null;
-
-    final start = isMoved ? movedIndex : askIndex;
-    final parts = message.substring(start).split(' ');
-    if (parts.length < 3) return null;
-    final slot = int.tryParse(parts[1]) ?? -1;
-    final address = _parseAddress(parts[2]);
-    if (address == null || slot < 0) return null;
-    return _ClusterRedirect(slot: slot, address: address, isMoved: isMoved);
-  }
-
-  bool _isRetryableError(Object error) {
-    final message = error.toString().toUpperCase();
-    return message.contains('TRYAGAIN') ||
-        message.contains('CLUSTERDOWN') ||
-        message.contains('LOADING');
-  }
-
-  bool _isClusterError(Object error) {
-    final message = error.toString().toUpperCase();
-    return message.contains('MOVED ') ||
-        message.contains('ASK ') ||
-        message.contains('CLUSTERDOWN') ||
-        message.contains('TRYAGAIN') ||
-        message.contains('CROSSSLOT');
-  }
-
-  ClusterNodeAddress? _parseAddress(String value) {
-    if (value.startsWith('[')) {
-      final endBracket = value.indexOf(']');
-      if (endBracket == -1) return null;
-      final host = value.substring(1, endBracket);
-      final portPart = value.substring(endBracket + 2);
-      final port = int.tryParse(portPart);
-      if (port == null) return null;
-      return ClusterNodeAddress(host, port);
-    }
-    final separator = value.lastIndexOf(':');
-    if (separator == -1) return null;
-    final host = value.substring(0, separator);
-    final port = int.tryParse(value.substring(separator + 1));
-    if (port == null) return null;
-    return ClusterNodeAddress(host, port);
-  }
-}
-
-class _ClusterRedirect {
-  final int slot;
-  final ClusterNodeAddress address;
-  final bool isMoved;
-
-  _ClusterRedirect({
-    required this.slot,
-    required this.address,
-    required this.isMoved,
-  });
 }
 
 class ClusterPipeline {

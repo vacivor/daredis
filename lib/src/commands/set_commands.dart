@@ -36,7 +36,7 @@ extension RedisSetCommands on RedisCommandExecutor {
   }
 
   Future<List<String>> sPop(String key, [int? count]) async {
-    final res = await sendCommand(['SPOP', key, if (count != null) count]);
+    final res = await sendCommand(['SPOP', key, ?count]);
     if (res is List) return res.map((e) => e.toString()).toList();
     if (res != null) return [res.toString()];
     return [];

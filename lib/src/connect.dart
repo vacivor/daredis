@@ -35,7 +35,7 @@ class Connection {
   bool _isReconnecting = false;
   int _reconnectAttempts = 0;
 
-  late Socket? _socket;
+  Socket? _socket;
 
   Connection({
     required this.host,

@@ -1,6 +1,6 @@
 import '../daredis.dart';
 
-class Daredis extends DaredisBase {
+class Daredis extends RedisClient {
   final ConnectionOptions options;
   final Pool<Connection> _pool;
   bool _connected = false;
@@ -14,11 +14,21 @@ class Daredis extends DaredisBase {
     ReconnectPolicy? reconnectPolicy,
     int? maxWaiters,
     Duration? acquireTimeout,
+    Duration? idleTimeout,
+    Duration? evictionInterval,
+    int createMaxAttempts = 1,
+    Duration createRetryDelay = const Duration(milliseconds: 50),
+    bool useLifo = false,
   }) : _pool = Pool<Connection>(
          config: PoolConfig(
            maxSize: poolSize,
            maxWaiters: maxWaiters,
            acquireTimeout: acquireTimeout,
+           idleTimeout: idleTimeout,
+           evictionInterval: evictionInterval,
+           createMaxAttempts: createMaxAttempts,
+           createRetryDelay: createRetryDelay,
+           useLifo: useLifo,
            testOnBorrow: testOnBorrow,
            testOnReturn: testOnReturn,
          ),
@@ -88,5 +98,17 @@ class Daredis extends DaredisBase {
     );
     await pubsub.connect();
     return pubsub;
+  }
+
+  Future<RedisTransaction> openTransaction({
+    ReconnectPolicy? reconnectPolicy,
+  }) async {
+    final transaction = RedisTransaction.fromOptions(
+      options.copyWith(
+        reconnectPolicy: reconnectPolicy ?? options.reconnectPolicy,
+      ),
+    );
+    await transaction.connect();
+    return transaction;
   }
 }

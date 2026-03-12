@@ -54,7 +54,7 @@ extension RedisGeoCommands on RedisCommandExecutor {
     return [];
   }
 
-  Future<List<List<double>?>> geopos(String key, List<String> members) async {
+  Future<List<List<double>?>> geoPos(String key, List<String> members) async {
     final res = await sendCommand(['GEOPOS', key, ...members]);
     if (res is List) {
       return res.map((e) {

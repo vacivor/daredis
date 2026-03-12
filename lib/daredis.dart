@@ -4,15 +4,17 @@
 library;
 
 import 'package:daredis/src/command_executor.dart';
+import 'package:daredis/src/cluster_slots.dart';
 import 'package:daredis/src/commands/decoders.dart';
 import 'package:daredis/src/exceptions.dart';
 
 export 'src/connect.dart';
 export 'src/pubsub.dart';
 export 'src/pubsub_message.dart';
-export 'src/client_base.dart';
+export 'src/redis_client.dart';
 export 'src/command_executor.dart';
 export 'src/pipeline.dart';
+export 'src/transaction.dart';
 export 'src/cluster_command_spec.dart';
 export 'src/pool.dart';
 export 'src/daredis.dart';

@@ -8,6 +8,24 @@ import 'package:daredis/src/exceptions.dart';
 import 'package:daredis/src/pubsub_message.dart';
 import 'package:daredis/src/resp.dart';
 
+List<List<dynamic>> buildPubSubResubscribeCommands({
+  required Iterable<String> channels,
+  required Iterable<String> patterns,
+}) {
+  final commands = <List<dynamic>>[];
+  final channelList = channels.toList(growable: false);
+  final patternList = patterns.toList(growable: false);
+
+  if (channelList.isNotEmpty) {
+    commands.add(['SUBSCRIBE', ...channelList]);
+  }
+  if (patternList.isNotEmpty) {
+    commands.add(['PSUBSCRIBE', ...patternList]);
+  }
+
+  return commands;
+}
+
 class RedisPubSub {
   final String host;
   final int port;
@@ -24,7 +42,7 @@ class RedisPubSub {
   bool _isReconnecting = false;
   int _reconnectAttempts = 0;
 
-  late Socket? _socket;
+  Socket? _socket;
   final _pubSubController = StreamController<PubSubMessage>.broadcast();
   final Queue<_PubSubAckWaiter> _ackQueue = Queue();
   final Set<String> _channels = {};
@@ -223,6 +241,14 @@ class RedisPubSub {
     }
   }
 
+  /// Feeds a decoded pub/sub frame into the session.
+  ///
+  /// This is useful for tests and for custom transports that already decode
+  /// RESP frames outside of [RedisPubSub].
+  void handleFrame(List<dynamic> frame) {
+    _handlePubSubFrame(frame);
+  }
+
   Future<void> _sendCommand(List<dynamic> command) async {
     if (_socket == null) {
       throw DaredisConnectionException("Not connected");
@@ -356,22 +382,29 @@ class RedisPubSub {
   }
 
   Future<void> _resubscribe() async {
-    if (_channels.isNotEmpty) {
-      final waiter = _PubSubAckWaiter(
-        types: const {'subscribe'},
-        remaining: _channels.length,
-      );
-      _ackQueue.add(waiter);
-      await _sendCommand(['SUBSCRIBE', ..._channels]);
-      await waiter.completer.future.timeout(commandTimeout);
-    }
-    if (_patterns.isNotEmpty) {
+    final commands = buildPubSubResubscribeCommands(
+      channels: _channels,
+      patterns: _patterns,
+    );
+
+    for (final command in commands) {
+      if (command.first == 'SUBSCRIBE') {
+        final waiter = _PubSubAckWaiter(
+          types: const {'subscribe'},
+          remaining: command.length - 1,
+        );
+        _ackQueue.add(waiter);
+        await _sendCommand(command);
+        await waiter.completer.future.timeout(commandTimeout);
+        continue;
+      }
+
       final waiter = _PubSubAckWaiter(
         types: const {'psubscribe'},
-        remaining: _patterns.length,
+        remaining: command.length - 1,
       );
       _ackQueue.add(waiter);
-      await _sendCommand(['PSUBSCRIBE', ..._patterns]);
+      await _sendCommand(command);
       await waiter.completer.future.timeout(commandTimeout);
     }
   }

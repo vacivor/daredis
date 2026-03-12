@@ -41,4 +41,9 @@ class Decoders {
     if (res == null) return null;
     return toBool(res);
   }
+
+  static List<String> toStringList(dynamic res) {
+    if (res is! List) return const [];
+    return res.map((value) => value.toString()).toList(growable: false);
+  }
 }

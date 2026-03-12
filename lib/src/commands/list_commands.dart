@@ -100,7 +100,7 @@ extension RedisListCommands on RedisCommandExecutor {
     return null;
   }
 
-  Future<String?> rpoplpush(String source, String destination) async {
+  Future<String?> rPopLPush(String source, String destination) async {
     final res = await sendCommand(['RPOPLPUSH', source, destination]);
     return Decoders.toStringOrNull(res);
   }
@@ -121,7 +121,7 @@ extension RedisListCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
-  Future<String?> blMove(
+  Future<String?> bLMove(
     String source,
     String destination,
     String whereFrom,

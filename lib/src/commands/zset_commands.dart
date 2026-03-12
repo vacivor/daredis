@@ -219,13 +219,13 @@ extension RedisSortedSetCommands on RedisCommandExecutor {
   }
 
   Future<List<String>> zPopMin(String key, [int? count]) async {
-    final res = await sendCommand(['ZPOPMIN', key, if (count != null) count]);
+    final res = await sendCommand(['ZPOPMIN', key, ?count]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
   }
 
   Future<List<String>> zPopMax(String key, [int? count]) async {
-    final res = await sendCommand(['ZPOPMAX', key, if (count != null) count]);
+    final res = await sendCommand(['ZPOPMAX', key, ?count]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
   }

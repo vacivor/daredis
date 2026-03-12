@@ -16,6 +16,117 @@ class StreamPendingInfo {
   StreamPendingInfo(this.count, {this.lowerId, this.higherId, this.consumers});
 }
 
+class StreamGroupInfo {
+  final String name;
+  final int consumers;
+  final int pending;
+  final String? lastDeliveredId;
+  final Map<String, dynamic> raw;
+
+  StreamGroupInfo({
+    required this.name,
+    required this.consumers,
+    required this.pending,
+    required this.lastDeliveredId,
+    required this.raw,
+  });
+
+  factory StreamGroupInfo.fromReply(dynamic reply) {
+    final map = _streamReplyAsMap(reply);
+    return StreamGroupInfo(
+      name: map['name']?.toString() ?? '',
+      consumers: int.tryParse(map['consumers']?.toString() ?? '0') ?? 0,
+      pending: int.tryParse(map['pending']?.toString() ?? '0') ?? 0,
+      lastDeliveredId: map['last-delivered-id']?.toString(),
+      raw: map,
+    );
+  }
+}
+
+class StreamConsumerInfo {
+  final String name;
+  final int pending;
+  final int idle;
+  final Map<String, dynamic> raw;
+
+  StreamConsumerInfo({
+    required this.name,
+    required this.pending,
+    required this.idle,
+    required this.raw,
+  });
+
+  factory StreamConsumerInfo.fromReply(dynamic reply) {
+    final map = _streamReplyAsMap(reply);
+    return StreamConsumerInfo(
+      name: map['name']?.toString() ?? '',
+      pending: int.tryParse(map['pending']?.toString() ?? '0') ?? 0,
+      idle: int.tryParse(map['idle']?.toString() ?? '0') ?? 0,
+      raw: map,
+    );
+  }
+}
+
+class StreamInfo {
+  final int length;
+  final int? radixTreeKeys;
+  final int? radixTreeNodes;
+  final int? groups;
+  final int? lastGeneratedIdMs;
+  final String? lastGeneratedId;
+  final String? maxDeletedEntryId;
+  final String? entriesAdded;
+  final String? recordedFirstEntryId;
+  final Map<String, dynamic> raw;
+
+  StreamInfo({
+    required this.length,
+    required this.radixTreeKeys,
+    required this.radixTreeNodes,
+    required this.groups,
+    required this.lastGeneratedIdMs,
+    required this.lastGeneratedId,
+    required this.maxDeletedEntryId,
+    required this.entriesAdded,
+    required this.recordedFirstEntryId,
+    required this.raw,
+  });
+
+  factory StreamInfo.fromReply(dynamic reply) {
+    final map = _streamReplyAsMap(reply);
+    return StreamInfo(
+      length: int.tryParse(map['length']?.toString() ?? '0') ?? 0,
+      radixTreeKeys: int.tryParse(map['radix-tree-keys']?.toString() ?? ''),
+      radixTreeNodes: int.tryParse(map['radix-tree-nodes']?.toString() ?? ''),
+      groups: int.tryParse(map['groups']?.toString() ?? ''),
+      lastGeneratedIdMs: int.tryParse(
+        map['last-generated-id-ms']?.toString() ?? '',
+      ),
+      lastGeneratedId: map['last-generated-id']?.toString(),
+      maxDeletedEntryId: map['max-deleted-entry-id']?.toString(),
+      entriesAdded: map['entries-added']?.toString(),
+      recordedFirstEntryId: map['recorded-first-entry-id']?.toString(),
+      raw: map,
+    );
+  }
+}
+
+Map<String, dynamic> _streamReplyAsMap(dynamic value) {
+  if (value is Map) {
+    return value.map(
+      (key, nestedValue) => MapEntry(key.toString(), nestedValue),
+    );
+  }
+  if (value is List && value.length.isEven) {
+    final map = <String, dynamic>{};
+    for (var i = 0; i < value.length; i += 2) {
+      map[value[i].toString()] = value[i + 1];
+    }
+    return map;
+  }
+  throw DaredisProtocolException('Unexpected stream reply: $value');
+}
+
 extension RedisStreamCommands on RedisCommandExecutor {
   Future<String> xAdd(
     String key, {
@@ -114,6 +225,67 @@ extension RedisStreamCommands on RedisCommandExecutor {
     return sendCommand(['XGROUP', ...args]);
   }
 
+  Future<String> xGroupCreate(
+    String key,
+    String group,
+    String id, {
+    bool mkStream = false,
+    String? entriesRead,
+  }) async {
+    final args = <dynamic>['XGROUP', 'CREATE', key, group, id];
+    if (mkStream) args.add('MKSTREAM');
+    if (entriesRead != null) args.addAll(['ENTRIESREAD', entriesRead]);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<int> xGroupCreateConsumer(
+    String key,
+    String group,
+    String consumer,
+  ) async {
+    final res = await sendCommand([
+      'XGROUP',
+      'CREATECONSUMER',
+      key,
+      group,
+      consumer,
+    ]);
+    return Decoders.toInt(res);
+  }
+
+  Future<int> xGroupDelConsumer(
+    String key,
+    String group,
+    String consumer,
+  ) async {
+    final res = await sendCommand([
+      'XGROUP',
+      'DELCONSUMER',
+      key,
+      group,
+      consumer,
+    ]);
+    return Decoders.toInt(res);
+  }
+
+  Future<int> xGroupDestroy(String key, String group) async {
+    final res = await sendCommand(['XGROUP', 'DESTROY', key, group]);
+    return Decoders.toInt(res);
+  }
+
+  Future<String> xGroupSetId(
+    String key,
+    String group,
+    String id, {
+    String? entriesRead,
+  }) async {
+    final args = <dynamic>['XGROUP', 'SETID', key, group, id];
+    if (entriesRead != null) args.addAll(['ENTRIESREAD', entriesRead]);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
   Future<List<Map<String, List<StreamMessage>>>> xReadGroup({
     required String group,
     required String consumer,
@@ -206,6 +378,51 @@ extension RedisStreamCommands on RedisCommandExecutor {
 
   Future<dynamic> xInfo(List<dynamic> args) async {
     return sendCommand(['XINFO', ...args]);
+  }
+
+  Future<dynamic> xInfoStream(String key, {bool full = false, int? count}) {
+    final args = <dynamic>['STREAM', key];
+    if (full) {
+      args.add('FULL');
+      if (count != null) args.addAll(['COUNT', count]);
+    }
+    return xInfo(args);
+  }
+
+  Future<StreamInfo> xInfoStreamEntry(
+    String key, {
+    bool full = false,
+    int? count,
+  }) async {
+    final res = await xInfoStream(key, full: full, count: count);
+    return StreamInfo.fromReply(res);
+  }
+
+  Future<dynamic> xInfoGroups(String key) {
+    return xInfo(['GROUPS', key]);
+  }
+
+  Future<dynamic> xInfoConsumers(String key, String group) {
+    return xInfo(['CONSUMERS', key, group]);
+  }
+
+  Future<List<StreamGroupInfo>> xInfoGroupEntries(String key) async {
+    final res = await xInfoGroups(key);
+    if (res is List) {
+      return res.map((entry) => StreamGroupInfo.fromReply(entry)).toList();
+    }
+    return [];
+  }
+
+  Future<List<StreamConsumerInfo>> xInfoConsumerEntries(
+    String key,
+    String group,
+  ) async {
+    final res = await xInfoConsumers(key, group);
+    if (res is List) {
+      return res.map((entry) => StreamConsumerInfo.fromReply(entry)).toList();
+    }
+    return [];
   }
 
   Future<int> xDelEx(String key, List<String> ids) async {

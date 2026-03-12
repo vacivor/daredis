@@ -1,7 +1,7 @@
 import 'package:daredis/src/command_executor.dart';
 import 'package:daredis/src/exceptions.dart';
 
-abstract class DaredisBase implements RedisCommandExecutor {
+abstract class RedisClient implements RedisCommandExecutor {
   bool get isConnected;
 
   bool get isClosed;

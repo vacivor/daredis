@@ -1,7 +1,63 @@
 part of '../../daredis.dart';
 
+class ClusterSlotRange {
+  final int start;
+  final int end;
+  final ClusterNodeAddress primary;
+  final List<ClusterNodeAddress> replicas;
+  final List<dynamic> raw;
+
+  ClusterSlotRange({
+    required this.start,
+    required this.end,
+    required this.primary,
+    required this.replicas,
+    required this.raw,
+  });
+
+  factory ClusterSlotRange.fromReply(dynamic reply) {
+    if (reply is! List || reply.length < 3) {
+      throw DaredisProtocolException(
+        'Unexpected CLUSTER SLOTS entry: $reply',
+      );
+    }
+    final start = int.parse(reply[0].toString());
+    final end = int.parse(reply[1].toString());
+    final primary = _clusterNodeAddressFromReply(reply[2]);
+    final replicas = <ClusterNodeAddress>[];
+    for (final node in reply.skip(3)) {
+      replicas.add(_clusterNodeAddressFromReply(node));
+    }
+    return ClusterSlotRange(
+      start: start,
+      end: end,
+      primary: primary,
+      replicas: replicas,
+      raw: List<dynamic>.from(reply),
+    );
+  }
+}
+
+ClusterNodeAddress _clusterNodeAddressFromReply(dynamic reply) {
+  if (reply is! List || reply.length < 2) {
+    throw DaredisProtocolException('Unexpected cluster node reply: $reply');
+  }
+  return ClusterNodeAddress(
+    reply[0].toString(),
+    int.parse(reply[1].toString()),
+  );
+}
+
 extension RedisClusterCommands on RedisCommandExecutor {
   Future<dynamic> clusterSlots() => sendCommand(['CLUSTER', 'SLOTS']);
+
+  Future<List<ClusterSlotRange>> clusterSlotRanges() async {
+    final res = await clusterSlots();
+    if (res is List) {
+      return res.map((entry) => ClusterSlotRange.fromReply(entry)).toList();
+    }
+    return [];
+  }
 
   Future<String> clusterNodes() async {
     final res = await sendCommand(['CLUSTER', 'NODES']);
@@ -64,12 +120,12 @@ extension RedisClusterCommands on RedisCommandExecutor {
     return Decoders.string(res);
   }
 
-  Future<String> readonly() async {
+  Future<String> readOnly() async {
     final res = await sendCommand(['READONLY']);
     return Decoders.string(res);
   }
 
-  Future<String> readwrite() async {
+  Future<String> readWrite() async {
     final res = await sendCommand(['READWRITE']);
     return Decoders.string(res);
   }

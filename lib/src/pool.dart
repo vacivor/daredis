@@ -30,6 +30,15 @@ class PoolConfig {
   /// 后台清理任务运行的时间间隔
   final Duration? evictionInterval;
 
+  /// 每次后台清理最多处理的空闲连接数，null 表示处理全部
+  final int? evictionMaxItems;
+
+  /// 创建资源失败后的最大重试次数，包含首次尝试
+  final int createMaxAttempts;
+
+  /// 创建资源失败后的重试间隔
+  final Duration createRetryDelay;
+
   /// 借用连接时是否进行有效性检查
   final bool testOnBorrow;
 
@@ -39,6 +48,9 @@ class PoolConfig {
   /// 是否开启空闲检查
   final bool testWhileIdle;
 
+  /// 是否优先复用最近归还的连接
+  final bool useLifo;
+
   PoolConfig({
     this.maxSize = 8,
     int? maxIdle,
@@ -47,12 +59,21 @@ class PoolConfig {
     this.acquireTimeout,
     this.idleTimeout,
     this.evictionInterval,
+    this.evictionMaxItems,
+    this.createMaxAttempts = 1,
+    this.createRetryDelay = const Duration(milliseconds: 50),
     this.testOnBorrow = true,
     this.testOnReturn = false,
     this.testWhileIdle = true,
+    this.useLifo = false,
   }) : maxIdle = maxIdle ?? maxSize,
        assert(maxSize > 0, 'maxSize must be > 0'),
        assert(minIdle >= 0, 'minIdle must be >= 0'),
+       assert(createMaxAttempts > 0, 'createMaxAttempts must be > 0'),
+       assert(
+         evictionMaxItems == null || evictionMaxItems > 0,
+         'evictionMaxItems must be > 0',
+       ),
        assert(maxWaiters == null || maxWaiters >= 0, 'maxWaiters must be >= 0'),
        assert(
          acquireTimeout == null || !acquireTimeout.isNegative,
@@ -65,6 +86,10 @@ class PoolConfig {
        assert(
          evictionInterval == null || !evictionInterval.isNegative,
          'evictionInterval must be >= 0',
+       ),
+       assert(
+         !createRetryDelay.isNegative,
+         'createRetryDelay must be >= 0',
        ) {
     assert(maxIdle == null || (this.maxIdle >= 0 && this.maxIdle <= maxSize),
         'maxIdle must be >= 0 and <= maxSize');
@@ -116,13 +141,29 @@ class Pool<T> {
   int _total = 0;
   bool _closed = false;
   Timer? _evictionTimer;
+  bool _isServingWaiters = false;
+  bool _isEnsuringMinIdle = false;
+  DateTime? _lastEvictionAt;
+  DateTime? _lastCreateFailureAt;
+  int _createdCount = 0;
+  int _disposedCount = 0;
+  int _createFailureCount = 0;
 
   /// 连接池统计信息
   PoolStats get stats => PoolStats(
     total: _total,
     idle: _idle.length,
     inUse: inUseCount,
+    creating: _creating,
     waiters: _waiters.length,
+    maxSize: config.maxSize,
+    maxIdle: config.maxIdle,
+    minIdle: config.minIdle,
+    createdCount: _createdCount,
+    disposedCount: _disposedCount,
+    createFailureCount: _createFailureCount,
+    lastEvictionAt: _lastEvictionAt,
+    lastCreateFailureAt: _lastCreateFailureAt,
     isClosed: _closed,
   );
 
@@ -157,7 +198,14 @@ class Pool<T> {
 
     // 1. 尝试从空闲队列获取
     while (_idle.isNotEmpty) {
-      final idleItem = _idle.removeFirst();
+      final idleItem = _takeIdleItem();
+      if (idleItem == null) {
+        break;
+      }
+      if (_isIdleExpired(idleItem)) {
+        _disposeItem(idleItem.item); // 超时直接回收
+        continue;
+      }
       if (await _isValid(idleItem.item, config.testOnBorrow)) {
         return idleItem.item;
       }
@@ -195,28 +243,45 @@ class Pool<T> {
   /// 归还资源
   Future<void> release(T item) async {
     if (_closed) {
-      _disposeItem(item);
+      await _disposeItem(item);
       return;
     }
 
     if (!await _isValid(item, config.testOnReturn)) {
-      _disposeItem(item);
+      await _disposeItem(item);
       _serveWaiters(); // 补位
       return;
     }
 
     // 如果有等待者，直接交给等待者
     if (_waiters.isNotEmpty) {
-      _waiters.removeFirst().complete(item);
+      final idleItem = _IdleItem(item);
+      if (_isIdleExpired(idleItem)) {
+        await _disposeItem(item);
+        _serveWaiters();
+        return;
+      }
+      if (await _isValid(item, config.testOnBorrow)) {
+        _waiters.removeFirst().complete(item);
+        return;
+      }
+      await _disposeItem(item);
+      _serveWaiters();
       return;
     }
 
     // 否则放入空闲队列
     if (_idle.length < config.maxIdle) {
-      _idle.addLast(_IdleItem(item));
+      final idleItem = _IdleItem(item);
+      if (_isIdleExpired(idleItem)) {
+        await _disposeItem(item);
+        _serveWaiters();
+        return;
+      }
+      _idle.addLast(idleItem);
       _ensureMinIdle();
     } else {
-      _disposeItem(item);
+      await _disposeItem(item);
     }
   }
 
@@ -248,7 +313,7 @@ class Pool<T> {
     _idle.clear();
 
     for (final item in itemsToDispose) {
-      _disposeItem(item);
+      await _disposeItem(item);
     }
     // 注意：正在使用的连接由使用者在使用完 release 时发现 pool 已关闭而销毁
   }
@@ -257,8 +322,9 @@ class Pool<T> {
     _total++;
     _creating++;
     try {
-      final item = await _create();
+      final item = await _createWithRetry();
       _creating--;
+      _createdCount++;
       return item;
     } catch (e) {
       _total--;
@@ -268,37 +334,50 @@ class Pool<T> {
   }
 
   void _serveWaiters() async {
-    if (_closed || _waiters.isEmpty) return;
+    if (_closed || _waiters.isEmpty || _isServingWaiters) return;
 
-    // 尝试用空闲资源满足等待者
-    while (_waiters.isNotEmpty && _idle.isNotEmpty) {
-      final idleItem = _idle.removeFirst();
-      if (await _isValid(idleItem.item, config.testOnBorrow)) {
-        _waiters.removeFirst().complete(idleItem.item);
-      } else {
-        _disposeItem(idleItem.item);
-      }
-    }
-
-    // 如果还有等待者且没到上限，创建新资源
-    while (_waiters.isNotEmpty && _total < config.maxSize) {
-      try {
-        final item = await _createNewItem();
-        if (_waiters.isNotEmpty) {
-          _waiters.removeFirst().complete(item);
+    _isServingWaiters = true;
+    try {
+      // 尝试用空闲资源满足等待者
+      while (_waiters.isNotEmpty && _idle.isNotEmpty) {
+        final idleItem = _takeIdleItem();
+        if (idleItem == null) {
+          break;
+        }
+        if (_isIdleExpired(idleItem)) {
+          await _disposeItem(idleItem.item);
+          continue;
+        }
+        if (await _isValid(idleItem.item, config.testOnBorrow)) {
+          _waiters.removeFirst().complete(idleItem.item);
         } else {
-          await release(item);
-        }
-      } catch (e, stack) {
-        if (_waiters.isNotEmpty) {
-          _waiters.removeFirst().completeError(e, stack);
+          await _disposeItem(idleItem.item);
         }
       }
+
+      // 如果还有等待者且没到上限，创建新资源
+      while (_waiters.isNotEmpty && _total < config.maxSize) {
+        try {
+          final item = await _createNewItem();
+          if (_waiters.isNotEmpty) {
+            _waiters.removeFirst().complete(item);
+          } else {
+            await release(item);
+          }
+        } catch (e, stack) {
+          if (_waiters.isNotEmpty) {
+            _waiters.removeFirst().completeError(e, stack);
+          }
+        }
+      }
+    } finally {
+      _isServingWaiters = false;
     }
   }
 
   Future<void> _disposeItem(T item) async {
     _total--;
+    _disposedCount++;
     try {
       if (_dispose != null) {
         await _dispose(item);
@@ -317,17 +396,64 @@ class Pool<T> {
     }
   }
 
-  void _ensureMinIdle() async {
-    if (_closed || _total >= config.maxSize || _idle.length >= config.minIdle)
-      return;
+  bool _isIdleExpired(_IdleItem<T> idleItem) {
+    if (config.idleTimeout == null) return false;
+    final now = DateTime.now();
+    return now.difference(idleItem.lastActive) > config.idleTimeout!;
+  }
 
-    while (_total < config.maxSize && _idle.length < config.minIdle) {
+  _IdleItem<T>? _takeIdleItem() {
+    if (_idle.isEmpty) {
+      return null;
+    }
+    return config.useLifo ? _idle.removeLast() : _idle.removeFirst();
+  }
+
+  Future<T> _createWithRetry() async {
+    Object? lastError;
+    StackTrace? lastStackTrace;
+
+    for (var attempt = 0; attempt < config.createMaxAttempts; attempt++) {
       try {
-        final item = await _createNewItem();
-        _idle.addLast(_IdleItem(item));
-      } catch (_) {
-        break; // 创建失败则停止补足
+        return await _create();
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        _lastCreateFailureAt = DateTime.now();
+        _createFailureCount++;
+        final hasMoreAttempts = attempt + 1 < config.createMaxAttempts;
+        if (hasMoreAttempts) {
+          await Future.delayed(config.createRetryDelay);
+        }
       }
+    }
+
+    Error.throwWithStackTrace(
+      lastError ?? DaredisConnectionException('Pool create failed'),
+      lastStackTrace ?? StackTrace.current,
+    );
+  }
+
+  void _ensureMinIdle() async {
+    if (_isEnsuringMinIdle ||
+        _closed ||
+        _total >= config.maxSize ||
+        _idle.length >= config.minIdle) {
+      return;
+    }
+
+    _isEnsuringMinIdle = true;
+    try {
+      while (_total < config.maxSize && _idle.length < config.minIdle) {
+        try {
+          final item = await _createNewItem();
+          _idle.addLast(_IdleItem(item));
+        } catch (_) {
+          break; // 创建失败则停止补足
+        }
+      }
+    } finally {
+      _isEnsuringMinIdle = false;
     }
   }
 
@@ -338,9 +464,12 @@ class Pool<T> {
       if (_closed) return;
 
       final now = DateTime.now();
+      _lastEvictionAt = now;
       final toRemove = <_IdleItem<T>>[];
+      final maxItems = config.evictionMaxItems ?? _idle.length;
+      final itemsToInspect = _idle.take(maxItems).toList();
 
-      for (final idleItem in _idle) {
+      for (final idleItem in itemsToInspect) {
         // 1. 检查超时
         if (config.idleTimeout != null) {
           if (now.difference(idleItem.lastActive) > config.idleTimeout!) {
@@ -374,18 +503,36 @@ class PoolStats {
   final int total;
   final int idle;
   final int inUse;
+  final int creating;
   final int waiters;
+  final int maxSize;
+  final int maxIdle;
+  final int minIdle;
+  final int createdCount;
+  final int disposedCount;
+  final int createFailureCount;
+  final DateTime? lastEvictionAt;
+  final DateTime? lastCreateFailureAt;
   final bool isClosed;
 
   const PoolStats({
     required this.total,
     required this.idle,
     required this.inUse,
+    required this.creating,
     required this.waiters,
+    required this.maxSize,
+    required this.maxIdle,
+    required this.minIdle,
+    required this.createdCount,
+    required this.disposedCount,
+    required this.createFailureCount,
+    required this.lastEvictionAt,
+    required this.lastCreateFailureAt,
     required this.isClosed,
   });
 
   @override
   String toString() =>
-      'PoolStats(total: $total, idle: $idle, inUse: $inUse, waiters: $waiters, isClosed: $isClosed)';
+      'PoolStats(total: $total, idle: $idle, inUse: $inUse, creating: $creating, waiters: $waiters, maxSize: $maxSize, maxIdle: $maxIdle, minIdle: $minIdle, createdCount: $createdCount, disposedCount: $disposedCount, createFailureCount: $createFailureCount, lastEvictionAt: $lastEvictionAt, lastCreateFailureAt: $lastCreateFailureAt, isClosed: $isClosed)';
 }
