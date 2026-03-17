@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisListCommands on RedisCommandExecutor {
+mixin RedisListCommands on RedisCommandExecutor {
   Future<int> lPush(String key, dynamic values) async {
     final res = await sendCommand([
       'LPUSH',

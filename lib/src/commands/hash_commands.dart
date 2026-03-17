@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisHashCommands on RedisCommandExecutor {
+mixin RedisHashCommands on RedisCommandExecutor {
   Future<int> hSet(String key, String field, String value) async {
     final res = await sendCommand(['HSET', key, field, value]);
     return Decoders.toInt(res);

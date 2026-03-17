@@ -17,7 +17,7 @@ class GeoRadiusResult {
   GeoRadiusResult(this.member, {this.distance, this.coordinates, this.hash});
 }
 
-extension RedisGeoCommands on RedisCommandExecutor {
+mixin RedisGeoCommands on RedisCommandExecutor {
   Future<int> geoAdd(
     String key,
     List<GeoMember> members, {

@@ -7,6 +7,7 @@ import 'package:daredis/src/command_executor.dart';
 import 'package:daredis/src/cluster_slots.dart';
 import 'package:daredis/src/commands/decoders.dart';
 import 'package:daredis/src/exceptions.dart';
+import 'package:daredis/src/redis_client.dart';
 
 export 'src/connect.dart';
 export 'src/pubsub.dart';

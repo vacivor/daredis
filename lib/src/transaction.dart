@@ -1,8 +1,19 @@
-import 'package:daredis/src/redis_client.dart';
-import 'package:daredis/src/command_executor.dart';
-import 'package:daredis/src/connect.dart';
+import '../daredis.dart';
 
-class RedisTransaction extends RedisClient implements RedisCommandExecutor {
+class RedisTransaction extends RedisTransactionSession
+    with
+        RedisServerCommands,
+        RedisStringCommands,
+        RedisKeyCommands,
+        RedisListCommands,
+        RedisHashCommands,
+        RedisSetCommands,
+        RedisSortedSetCommands,
+        RedisStreamCommands,
+        RedisScriptingCommands,
+        RedisGeoCommands,
+        RedisHyperLogLogCommands,
+        RedisTransactionCommands {
   final Connection _connection;
   bool _closed = false;
 

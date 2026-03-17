@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisKeyCommands on RedisCommandExecutor {
+mixin RedisKeyCommands on RedisCommandExecutor {
   Future<int> exists(dynamic keys) async {
     final res = await sendCommand([
       'EXISTS',

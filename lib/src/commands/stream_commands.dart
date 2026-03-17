@@ -127,7 +127,7 @@ Map<String, dynamic> _streamReplyAsMap(dynamic value) {
   throw DaredisProtocolException('Unexpected stream reply: $value');
 }
 
-extension RedisStreamCommands on RedisCommandExecutor {
+mixin RedisStreamCommands on RedisCommandExecutor {
   Future<String> xAdd(
     String key, {
     String id = '*',

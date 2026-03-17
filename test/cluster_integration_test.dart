@@ -26,8 +26,11 @@ void main() {
     });
 
     test('ping set/get incr and hash commands work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final tag = '{${testKey('cluster-slot')}}';
       final stringKey = 'daredis:test:cluster:string:$tag';
@@ -45,8 +48,11 @@ void main() {
     });
 
     test('pipeline executes commands in the same slot', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final tag = '{${testKey('cluster-pipe')}}';
       final key = 'daredis:test:cluster:pipeline:$tag';
@@ -66,8 +72,11 @@ void main() {
     });
 
     test('pubsub receives published messages on the seed node', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final channel = testKey('cluster:pubsub');
       final pubsub = await cluster.openPubSub();
@@ -90,8 +99,11 @@ void main() {
     });
 
     test('zset and stream commands work in one slot', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final tag = '{${testKey('cluster-data')}}';
       final zsetKey = 'daredis:test:cluster:zset:$tag';
@@ -117,8 +129,11 @@ void main() {
     });
 
     test('list set and hash scan work in one slot', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final tag = '{${testKey('cluster-collections')}}';
       final listKey = 'daredis:test:cluster:list:$tag';
@@ -148,8 +163,11 @@ void main() {
     });
 
     test('multi-key same-slot commands work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final tag = '{${testKey('cluster-multi')}}';
       final keyA = 'daredis:test:cluster:mget:a:$tag';
@@ -193,8 +211,11 @@ void main() {
     });
 
     test('cross-slot commands are rejected early', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final keyA = 'daredis:test:cluster:cross-slot:a:{${testKey('slot-a')}}';
       final keyB = 'daredis:test:cluster:cross-slot:b:{${testKey('slot-b')}}';
@@ -219,8 +240,11 @@ void main() {
     });
 
     test('transactions are explicitly unsupported', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
 
       expect(
@@ -230,8 +254,11 @@ void main() {
     });
 
     test('geo hyperloglog and scripting commands work in one slot', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       const script = "return redis.call('GET', KEYS[1])";
       final tag = '{${testKey('cluster-advanced')}}';
@@ -325,8 +352,11 @@ void main() {
     });
 
     test('stream group helpers work in one slot', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
       final tag = '{${testKey('cluster-stream-group')}}';
       final streamKey = 'daredis:test:cluster:stream-group:$tag';
@@ -364,8 +394,11 @@ void main() {
     });
 
     test('cluster metadata commands return sane values', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Redis Cluster is not reachable at $clusterHost:$clusterPort');
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
       }
 
       final info = await cluster.clusterInfo();

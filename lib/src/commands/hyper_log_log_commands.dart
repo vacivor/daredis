@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisHyperLogLogCommands on RedisCommandExecutor {
+mixin RedisHyperLogLogCommands on RedisCommandExecutor {
   Future<int> pfAdd(String key, dynamic elements) async {
     final res = await sendCommand([
       'PFADD',

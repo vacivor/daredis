@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisScriptingCommands on RedisCommandExecutor {
+mixin RedisScriptingCommands on RedisCommandExecutor {
   Future<T> _decodeEval<T>(
     Future<dynamic> Function() execute,
     T Function(dynamic res) decode,

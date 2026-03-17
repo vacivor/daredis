@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisSortedSetCommands on RedisCommandExecutor {
+mixin RedisSortedSetCommands on RedisCommandExecutor {
   Future<int> zAdd(
     String key,
     Map<String, double> scoreMembers, {

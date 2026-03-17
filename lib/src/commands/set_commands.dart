@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisSetCommands on RedisCommandExecutor {
+mixin RedisSetCommands on RedisCommandExecutor {
   Future<int> sAdd(String key, dynamic members) async {
     final res = await sendCommand([
       'SADD',

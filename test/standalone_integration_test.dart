@@ -26,8 +26,11 @@ void main() {
     });
 
     test('ping set/get incr and hash commands work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final stringKey = testKey('standalone:string');
       final counterKey = testKey('standalone:counter');
@@ -46,8 +49,11 @@ void main() {
     });
 
     test('pipeline batches commands', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final key = testKey('standalone:pipeline');
       addTearDown(() => deleteKeys(client, [key]));
@@ -66,8 +72,11 @@ void main() {
     });
 
     test('pubsub receives published messages', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final channel = testKey('standalone:pubsub');
       final pubsub = await client.openPubSub(
@@ -87,8 +96,11 @@ void main() {
     });
 
     test('scan zset and stream commands work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final scanKey = testKey('standalone:scan');
       final zsetKey = testKey('standalone:zset');
@@ -116,8 +128,11 @@ void main() {
     });
 
     test('list set and scan helpers work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final listKey = testKey('standalone:list');
       final setKey = testKey('standalone:set');
@@ -146,8 +161,11 @@ void main() {
     });
 
     test('multi exec and discard work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final key = testKey('standalone:txn');
       final transaction = await client.openTransaction();
@@ -171,8 +189,11 @@ void main() {
     });
 
     test('watch aborts exec after conflicting write', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final key = testKey('standalone:watch');
       final other = Daredis(
@@ -203,8 +224,11 @@ void main() {
     });
 
     test('geo hyperloglog and scripting commands work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       const script = "return redis.call('GET', KEYS[1])";
       final geoKey = testKey('standalone:geo');
@@ -310,8 +334,11 @@ void main() {
     });
 
     test('stream group helpers work', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
       final streamKey = testKey('standalone:stream-group');
       addTearDown(() => deleteKeys(client, [streamKey]));
@@ -348,8 +375,11 @@ void main() {
     });
 
     test('server metadata commands return sane values', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
 
       final info = await client.info('server');
@@ -366,8 +396,11 @@ void main() {
     });
 
     test('server helper APIs are usable', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
 
       expect(await client.clientTrackingOn(), 'OK');
@@ -410,8 +443,11 @@ void main() {
     });
 
     test('acl and function helper APIs are usable', timeout: integrationTestTimeout, () async {
-      if (!available) {
-        markTestSkipped('Standalone Redis is not reachable at $standaloneHost:$standalonePort');
+      if (skipIfUnavailable(
+        available,
+        'Standalone Redis is not reachable at $standaloneHost:$standalonePort',
+      )) {
+        return;
       }
 
       final libraryName = 'daredislib${DateTime.now().microsecondsSinceEpoch}';

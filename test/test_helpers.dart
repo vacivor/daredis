@@ -4,11 +4,19 @@ import 'dart:math';
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
-const standaloneHost = '192.168.50.144';
+const standaloneHost = '10.10.1.144';
 const standalonePort = 6379;
-const clusterHost = '192.168.50.145';
+const clusterHost = '10.10.1.145';
 const clusterPort = 7000;
 const integrationTestTimeout = Timeout(Duration(seconds: 20));
+
+bool skipIfUnavailable(bool available, String message) {
+  if (!available) {
+    markTestSkipped(message);
+    return true;
+  }
+  return false;
+}
 
 String testKey(String prefix) {
   final now = DateTime.now().microsecondsSinceEpoch;
@@ -22,7 +30,7 @@ Future<void> deleteKeys(
 ) async {
   final existing = keys.where((key) => key.isNotEmpty).toList(growable: false);
   if (existing.isEmpty) return;
-  await client.del(existing);
+  await client.sendCommand(['DEL', ...existing]);
 }
 
 Future<bool> isReachable(String host, int port) async {
@@ -49,9 +57,20 @@ Future<List<String>> scanAllMatches(
   var cursor = 0;
 
   do {
-    final result = await client.scan(cursor, match: pattern, count: 50);
-    matches.addAll(result.items);
-    cursor = result.cursor;
+    final result = await client.sendCommand([
+      'SCAN',
+      cursor,
+      'MATCH',
+      pattern,
+      'COUNT',
+      50,
+    ]);
+    if (result is List && result.length == 2 && result[1] is List) {
+      cursor = int.tryParse(result[0].toString()) ?? 0;
+      matches.addAll((result[1] as List).map((item) => item.toString()));
+    } else {
+      cursor = 0;
+    }
   } while (cursor != 0);
 
   return matches.toList(growable: false);

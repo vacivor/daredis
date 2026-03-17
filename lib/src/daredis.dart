@@ -1,6 +1,19 @@
 import '../daredis.dart';
 
-class Daredis extends RedisClient {
+class Daredis extends RedisClient
+    with
+        RedisServerCommands,
+        RedisStringCommands,
+        RedisKeyCommands,
+        RedisListCommands,
+        RedisHashCommands,
+        RedisSetCommands,
+        RedisSortedSetCommands,
+        RedisStreamCommands,
+        RedisScriptingCommands,
+        RedisGeoCommands,
+        RedisHyperLogLogCommands
+    implements RedisPubSubCapable, RedisTransactionCapable {
   final ConnectionOptions options;
   final Pool<Connection> _pool;
   bool _connected = false;
@@ -90,6 +103,7 @@ class Daredis extends RedisClient {
     (command, timeout) => sendCommand(command, timeout: timeout),
   );
 
+  @override
   Future<RedisPubSub> openPubSub({ReconnectPolicy? reconnectPolicy}) async {
     final pubsub = RedisPubSub.fromOptions(
       options.copyWith(
@@ -100,6 +114,7 @@ class Daredis extends RedisClient {
     return pubsub;
   }
 
+  @override
   Future<RedisTransaction> openTransaction({
     ReconnectPolicy? reconnectPolicy,
   }) async {

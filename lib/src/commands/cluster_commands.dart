@@ -48,7 +48,7 @@ ClusterNodeAddress _clusterNodeAddressFromReply(dynamic reply) {
   );
 }
 
-extension RedisClusterCommands on RedisCommandExecutor {
+mixin RedisClusterCommands on RedisClusterClient {
   Future<dynamic> clusterSlots() => sendCommand(['CLUSTER', 'SLOTS']);
 
   Future<List<ClusterSlotRange>> clusterSlotRanges() async {

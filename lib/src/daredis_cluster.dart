@@ -108,7 +108,21 @@ class ClusterOptions {
   });
 }
 
-class DaredisCluster extends RedisClient {
+class DaredisCluster extends RedisClusterClient
+    with
+        RedisServerCommands,
+        RedisStringCommands,
+        RedisKeyCommands,
+        RedisListCommands,
+        RedisHashCommands,
+        RedisSetCommands,
+        RedisSortedSetCommands,
+        RedisStreamCommands,
+        RedisScriptingCommands,
+        RedisGeoCommands,
+        RedisHyperLogLogCommands,
+        RedisClusterCommands
+    implements RedisPubSubCapable {
   final ClusterOptions options;
   final Pool<_DaredisClusterConnection> _pool;
   bool _connected = false;
@@ -196,6 +210,7 @@ class DaredisCluster extends RedisClient {
     (command, timeout) => sendCommand(command, timeout: timeout),
   );
 
+  @override
   Future<RedisPubSub> openPubSub({ClusterNode? node}) async {
     if (options.seeds.isEmpty) {
       throw DaredisStateException('Cluster seeds cannot be empty');
@@ -220,7 +235,7 @@ class DaredisCluster extends RedisClient {
   }
 }
 
-class _DaredisClusterConnection extends RedisClient {
+class _DaredisClusterConnection extends RedisClusterClient {
   final ClusterOptions options;
   final ClusterSlotCache _slotCache = ClusterSlotCache();
   final Map<ClusterNodeAddress, Pool<Connection>> _pools = {};

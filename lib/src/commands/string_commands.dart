@@ -1,6 +1,6 @@
 part of '../../daredis.dart';
 
-extension RedisStringCommands on RedisCommandExecutor {
+mixin RedisStringCommands on RedisCommandExecutor {
   Future<String?> get(String key) async {
     var res = await sendCommand(['GET', key]);
     return Decoders.toStringOrNull(res);

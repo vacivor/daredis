@@ -434,7 +434,7 @@ List<Map<String, dynamic>> _serverReplyAsMapList(dynamic value) {
   );
 }
 
-extension RedisServerCommands on RedisCommandExecutor {
+mixin RedisServerCommands on RedisCommandExecutor {
   Future<String> ping([String? message]) async {
     final args = ['PING'];
     if (message != null) args.add(message);
@@ -484,35 +484,6 @@ extension RedisServerCommands on RedisCommandExecutor {
   Future<int> clientId() async {
     final res = await sendCommand(['CLIENT', 'ID']);
     return Decoders.toInt(res);
-  }
-
-  Future<String> watch(List<String> keys) async {
-    final res = await sendCommand(['WATCH', ...keys]);
-    return Decoders.string(res);
-  }
-
-  Future<String> unwatch() async {
-    final res = await sendCommand(['UNWATCH']);
-    return Decoders.string(res);
-  }
-
-  Future<String> multi() async {
-    final res = await sendCommand(['MULTI']);
-    return Decoders.string(res);
-  }
-
-  Future<List<dynamic>?> exec() async {
-    final res = await sendCommand(['EXEC']);
-    if (res == null) return null;
-    if (res is List) return res;
-    throw DaredisProtocolException(
-      'Unexpected EXEC response type: ${res.runtimeType}',
-    );
-  }
-
-  Future<String> discard() async {
-    final res = await sendCommand(['DISCARD']);
-    return Decoders.string(res);
   }
 
   Future<String> clientSetName(String name) async {
@@ -908,6 +879,37 @@ extension RedisServerCommands on RedisCommandExecutor {
 
   Future<String> aclLogReset() async {
     final res = await sendCommand(['ACL', 'LOG', 'RESET']);
+    return Decoders.string(res);
+  }
+}
+
+mixin RedisTransactionCommands on RedisTransactionSession {
+  Future<String> watch(List<String> keys) async {
+    final res = await sendCommand(['WATCH', ...keys]);
+    return Decoders.string(res);
+  }
+
+  Future<String> unwatch() async {
+    final res = await sendCommand(['UNWATCH']);
+    return Decoders.string(res);
+  }
+
+  Future<String> multi() async {
+    final res = await sendCommand(['MULTI']);
+    return Decoders.string(res);
+  }
+
+  Future<List<dynamic>?> exec() async {
+    final res = await sendCommand(['EXEC']);
+    if (res == null) return null;
+    if (res is List) return res;
+    throw DaredisProtocolException(
+      'Unexpected EXEC response type: ${res.runtimeType}',
+    );
+  }
+
+  Future<String> discard() async {
+    final res = await sendCommand(['DISCARD']);
     return Decoders.string(res);
   }
 }

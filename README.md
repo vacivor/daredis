@@ -137,6 +137,17 @@ Why this matters:
 - `WATCH/MULTI/EXEC` must stay on the same connection
 - cluster routing needs an extra layer that maps keys to nodes
 
+### Command Surface Design
+
+The package models command availability through concrete client/session types.
+
+- `Daredis` exposes the normal command groups for pooled single-node access
+- `DaredisCluster` exposes the normal command groups plus cluster-only helpers
+- `RedisTransaction` exposes transaction commands like `WATCH`, `MULTI`, and `EXEC`
+
+This keeps command availability aligned with the underlying connection model
+instead of exposing every command on every executor shape.
+
 ## Connection Options
 
 ```dart
@@ -191,6 +202,9 @@ print(results);
 
 Transactions are exposed as a dedicated session because `WATCH`, `MULTI`, and
 `EXEC` must run on the same connection.
+
+Those transactional commands are intentionally exposed on `RedisTransaction`,
+not on the pooled `Daredis` client itself.
 
 ```dart
 final tx = await client.openTransaction();
