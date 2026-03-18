@@ -5,10 +5,15 @@ import 'package:daredis/src/exceptions.dart';
 
 const int _clusterSlotCount = 16384;
 
+/// Host and port pair for a Redis Cluster node.
 class ClusterNodeAddress {
+  /// Hostname or IP address of the cluster node.
   final String host;
+
+  /// TCP port of the cluster node.
   final int port;
 
+  /// Creates a cluster node address.
   const ClusterNodeAddress(this.host, this.port);
 
   @override
@@ -26,31 +31,37 @@ class ClusterNodeAddress {
   String toString() => '$host:$port';
 }
 
+/// In-memory slot-to-node mapping built from `CLUSTER SLOTS` responses.
 class ClusterSlotCache {
   final List<ClusterNodeAddress?> _slots = List<ClusterNodeAddress?>.filled(
     _clusterSlotCount,
     null,
   );
 
+  /// Returns the node responsible for [slot], or `null` when unknown.
   ClusterNodeAddress? nodeForSlot(int slot) {
     if (slot < 0 || slot >= _clusterSlotCount) return null;
     return _slots[slot];
   }
 
+  /// Returns the node responsible for [key], or `null` when unknown.
   ClusterNodeAddress? nodeForKey(String key) {
     return nodeForSlot(slotForKey(key));
   }
 
+  /// Computes the Redis Cluster slot for [key], including hash tag handling.
   int slotForKey(String key) {
     final hashKey = _extractHashTag(key);
     return CRC16.getStringCRC16(hashKey) % _clusterSlotCount;
   }
 
+  /// Updates the owner of [slot] to [node].
   void updateSlot(int slot, ClusterNodeAddress node) {
     if (slot < 0 || slot >= _clusterSlotCount) return;
     _slots[slot] = node;
   }
 
+  /// Replaces slot mappings using a raw `CLUSTER SLOTS` [response].
   void updateFromSlotsResponse(dynamic response) {
     if (response is! List) {
       throw RespException('Unexpected CLUSTER SLOTS response: $response');
@@ -70,6 +81,7 @@ class ClusterSlotCache {
     }
   }
 
+  /// Returns the distinct nodes currently referenced by the slot table.
   Iterable<ClusterNodeAddress> uniqueNodes() {
     final nodes = <ClusterNodeAddress>{};
     for (final node in _slots) {
@@ -78,6 +90,7 @@ class ClusterSlotCache {
     return nodes;
   }
 
+  /// Whether no slots have been populated yet.
   bool get isEmpty => _slots.every((node) => node == null);
 
   String _extractHashTag(String key) {
@@ -94,6 +107,7 @@ class ClusterSlotCache {
   }
 }
 
+/// Converts a raw Redis key representation to a Dart string.
 String keyToString(dynamic key) {
   if (key == null) return '';
   if (key is String) return key;

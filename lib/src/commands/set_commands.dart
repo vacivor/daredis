@@ -1,6 +1,7 @@
 part of '../../daredis.dart';
 
 mixin RedisSetCommands on RedisCommandExecutor {
+  /// Adds one or more [members] to the set at [key].
   Future<int> sAdd(String key, dynamic members) async {
     final res = await sendCommand([
       'SADD',
@@ -10,6 +11,7 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  /// Removes one or more [members] from the set at [key].
   Future<int> sRem(String key, dynamic members) async {
     final res = await sendCommand([
       'SREM',
@@ -19,22 +21,26 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  /// Returns all members of the set at [key].
   Future<List<String>> sMembers(String key) async {
     final res = await sendCommand(['SMEMBERS', key]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
   }
 
+  /// Returns whether [member] belongs to the set at [key].
   Future<bool> sIsMember(String key, String member) async {
     final res = await sendCommand(['SISMEMBER', key, member]);
     return Decoders.toBool(res);
   }
 
+  /// Returns the cardinality of the set at [key].
   Future<int> sCard(String key) async {
     final res = await sendCommand(['SCARD', key]);
     return Decoders.toInt(res);
   }
 
+  /// Pops one or more random members from the set at [key].
   Future<List<String>> sPop(String key, [int? count]) async {
     final res = await sendCommand(['SPOP', key, ?count]);
     if (res is List) return res.map((e) => e.toString()).toList();
@@ -42,6 +48,7 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Returns one or more random members from the set at [key] without removing them.
   Future<List<String>> sRandMember(String key, [int? count]) async {
     final args = <dynamic>['SRANDMEMBER', key];
     if (count != null) args.add(count);
@@ -51,44 +58,52 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Moves [member] from [source] to [destination].
   Future<bool> sMove(String source, String destination, String member) async {
     final res = await sendCommand(['SMOVE', source, destination, member]);
     return Decoders.toBool(res);
   }
 
+  /// Returns the set difference of all [keys].
   Future<List<String>> sDiff(List<String> keys) async {
     final res = await sendCommand(['SDIFF', ...keys]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
   }
 
+  /// Returns the set intersection of all [keys].
   Future<List<String>> sInter(List<String> keys) async {
     final res = await sendCommand(['SINTER', ...keys]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
   }
 
+  /// Returns the set union of all [keys].
   Future<List<String>> sUnion(List<String> keys) async {
     final res = await sendCommand(['SUNION', ...keys]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
   }
 
+  /// Stores the set difference of [keys] in [destination].
   Future<int> sDiffStore(String destination, List<String> keys) async {
     final res = await sendCommand(['SDIFFSTORE', destination, ...keys]);
     return Decoders.toInt(res);
   }
 
+  /// Stores the set intersection of [keys] in [destination].
   Future<int> sInterStore(String destination, List<String> keys) async {
     final res = await sendCommand(['SINTERSTORE', destination, ...keys]);
     return Decoders.toInt(res);
   }
 
+  /// Stores the set union of [keys] in [destination].
   Future<int> sUnionStore(String destination, List<String> keys) async {
     final res = await sendCommand(['SUNIONSTORE', destination, ...keys]);
     return Decoders.toInt(res);
   }
 
+  /// Returns the cardinality of the intersection of [keys].
   Future<int> sInterCard(List<String> keys, {int? limit}) async {
     final args = ['SINTERCARD', keys.length, ...keys];
     if (limit != null) args.addAll(['LIMIT', limit]);
@@ -96,6 +111,7 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  /// Iterates set members stored at [key] starting from [cursor].
   Future<ScanResult<String>> sScan(
     String key,
     int cursor, {

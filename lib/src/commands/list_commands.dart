@@ -1,6 +1,7 @@
 part of '../../daredis.dart';
 
 mixin RedisListCommands on RedisCommandExecutor {
+  /// Pushes one or more [values] onto the head of the list at [key].
   Future<int> lPush(String key, dynamic values) async {
     final res = await sendCommand([
       'LPUSH',
@@ -10,6 +11,7 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  /// Pushes one or more [values] onto the tail of the list at [key].
   Future<int> rPush(String key, dynamic values) async {
     final res = await sendCommand([
       'RPUSH',
@@ -19,11 +21,13 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  /// Pops and returns the first element of the list at [key].
   Future<String?> lPop(String key) async {
     final res = await sendCommand(['LPOP', key]);
     return Decoders.toStringOrNull(res);
   }
 
+  /// Pops up to [count] elements from the head of the list at [key].
   Future<List<String>> lPopCount(String key, int count) async {
     final res = await sendCommand(['LPOP', key, count]);
     if (res is List) return res.map((e) => e.toString()).toList();
@@ -31,11 +35,13 @@ mixin RedisListCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Pops and returns the last element of the list at [key].
   Future<String?> rPop(String key) async {
     final res = await sendCommand(['RPOP', key]);
     return Decoders.toStringOrNull(res);
   }
 
+  /// Pops up to [count] elements from the tail of the list at [key].
   Future<List<String>> rPopCount(String key, int count) async {
     final res = await sendCommand(['RPOP', key, count]);
     if (res is List) return res.map((e) => e.toString()).toList();
@@ -43,47 +49,56 @@ mixin RedisListCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Returns the elements of the list at [key] between [start] and [stop].
   Future<List<String>> lRange(String key, int start, int stop) async {
     final res = await sendCommand(['LRANGE', key, start, stop]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
   }
 
+  /// Returns the length of the list at [key].
   Future<int> lLen(String key) async {
     final res = await sendCommand(['LLEN', key]);
     return Decoders.toInt(res);
   }
 
+  /// Returns the list element at [index].
   Future<String?> lIndex(String key, int index) async {
     final res = await sendCommand(['LINDEX', key, index]);
     return Decoders.toStringOrNull(res);
   }
 
+  /// Replaces the list element at [index] with [value].
   Future<String> lSet(String key, int index, String value) async {
     final res = await sendCommand(['LSET', key, index, value]);
     return Decoders.string(res);
   }
 
+  /// Removes occurrences of [value] from the list at [key].
   Future<int> lRem(String key, int count, String value) async {
     final res = await sendCommand(['LREM', key, count, value]);
     return Decoders.toInt(res);
   }
 
+  /// Trims the list at [key] to the `[start, stop]` range.
   Future<String> lTrim(String key, int start, int stop) async {
     final res = await sendCommand(['LTRIM', key, start, stop]);
     return Decoders.string(res);
   }
 
+  /// Inserts [value] before [pivot] in the list at [key].
   Future<int> lInsertBefore(String key, String pivot, String value) async {
     final res = await sendCommand(['LINSERT', key, 'BEFORE', pivot, value]);
     return Decoders.toInt(res);
   }
 
+  /// Inserts [value] after [pivot] in the list at [key].
   Future<int> lInsertAfter(String key, String pivot, String value) async {
     final res = await sendCommand(['LINSERT', key, 'AFTER', pivot, value]);
     return Decoders.toInt(res);
   }
 
+  /// Blocks until an element can be popped from the head of one of [keys].
   Future<Map<String, String>?> bLPop(List<String> keys, int timeout) async {
     final res = await sendCommand(['BLPOP', ...keys, timeout]);
     if (res is List && res.length == 2) {
@@ -92,6 +107,7 @@ mixin RedisListCommands on RedisCommandExecutor {
     return null;
   }
 
+  /// Blocks until an element can be popped from the tail of one of [keys].
   Future<Map<String, String>?> bRPop(List<String> keys, int timeout) async {
     final res = await sendCommand(['BRPOP', ...keys, timeout]);
     if (res is List && res.length == 2) {
@@ -100,11 +116,13 @@ mixin RedisListCommands on RedisCommandExecutor {
     return null;
   }
 
+  /// Pops from [source] and pushes onto [destination].
   Future<String?> rPopLPush(String source, String destination) async {
     final res = await sendCommand(['RPOPLPUSH', source, destination]);
     return Decoders.toStringOrNull(res);
   }
 
+  /// Moves one element from [source] to [destination].
   Future<String?> lMove(
     String source,
     String destination,
@@ -121,6 +139,7 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Blocking variant of [lMove].
   Future<String?> bLMove(
     String source,
     String destination,
