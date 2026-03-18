@@ -7,50 +7,51 @@ typedef PoolFactory<T> = Future<T> Function();
 typedef PoolDisposer<T> = Future<void> Function(T item);
 typedef PoolValidator<T> = Future<bool> Function(T item);
 
-/// 连接池配置，参考 Jedis 的配置项
+/// Configuration for a generic resource pool.
 class PoolConfig {
-  /// 连接池允许的最大连接数
+  /// Maximum number of managed resources.
   final int maxSize;
 
-  /// 最大空闲连接数（默认等于 maxSize）
+  /// Maximum number of idle resources kept in the pool.
   final int maxIdle;
 
-  /// 最小空闲连接数
+  /// Minimum number of idle resources to keep warm.
   final int minIdle;
 
-  /// 最大等待队列长度，null 表示不限制
+  /// Maximum number of waiters, or `null` for no limit.
   final int? maxWaiters;
 
-  /// 获取连接时的默认超时时间
+  /// Default timeout while waiting to acquire a resource.
   final Duration? acquireTimeout;
 
-  /// 空闲连接的超时时间，超过此时间可能会被回收
+  /// Idle timeout after which resources may be evicted.
   final Duration? idleTimeout;
 
-  /// 后台清理任务运行的时间间隔
+  /// Interval for background eviction checks.
   final Duration? evictionInterval;
 
-  /// 每次后台清理最多处理的空闲连接数，null 表示处理全部
+  /// Maximum number of idle items processed per eviction run.
   final int? evictionMaxItems;
 
-  /// 创建资源失败后的最大重试次数，包含首次尝试
+  /// Maximum creation attempts, including the first try.
   final int createMaxAttempts;
 
-  /// 创建资源失败后的重试间隔
+  /// Delay between creation retries.
   final Duration createRetryDelay;
 
-  /// 借用连接时是否进行有效性检查
+  /// Whether to validate items when borrowing them.
   final bool testOnBorrow;
 
-  /// 归还连接时是否进行有效性检查
+  /// Whether to validate items when returning them.
   final bool testOnReturn;
 
-  /// 是否开启空闲检查
+  /// Whether idle items are validated during eviction.
   final bool testWhileIdle;
 
-  /// 是否优先复用最近归还的连接
+  /// Whether recently returned items are reused first.
   final bool useLifo;
 
+  /// Creates pool configuration.
   PoolConfig({
     this.maxSize = 8,
     int? maxIdle,
@@ -126,6 +127,7 @@ class _IdleItem<T> {
 }
 
 class Pool<T> {
+  /// Effective pool configuration.
   final PoolConfig config;
   final PoolFactory<T> _create;
   final PoolDisposer<T>? _dispose;
@@ -149,7 +151,7 @@ class Pool<T> {
   int _disposedCount = 0;
   int _createFailureCount = 0;
 
-  /// 连接池统计信息
+  /// Snapshot of current pool metrics.
   PoolStats get stats => PoolStats(
     total: _total,
     idle: _idle.length,
@@ -180,17 +182,22 @@ class Pool<T> {
     _ensureMinIdle();
   }
 
+  /// Whether the pool has been closed.
   bool get isClosed => _closed;
 
+  /// Total number of managed items, including idle, in-use, and creating.
   int get totalCount => _total;
 
+  /// Number of idle items currently available.
   int get idleCount => _idle.length;
 
+  /// Number of items currently checked out.
   int get inUseCount => _total - _idle.length - _creating;
 
+  /// Number of callers waiting in the acquire queue.
   int get waiterCount => _waiters.length;
 
-  /// 获取一个资源
+  /// Acquires an item from the pool or creates one if capacity allows.
   Future<T> acquire({Duration? timeout}) async {
     if (_closed) {
       throw DaredisStateException('Pool is closed');
@@ -240,7 +247,7 @@ class Pool<T> {
     return completer.future;
   }
 
-  /// 归还资源
+  /// Returns a previously acquired item to the pool.
   Future<void> release(T item) async {
     if (_closed) {
       await _disposeItem(item);

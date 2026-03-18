@@ -1,6 +1,7 @@
 import 'package:daredis/src/cluster_slots.dart';
 import 'package:daredis/src/exceptions.dart';
 
+/// Strategy used to locate keys inside a Redis command.
 enum KeySpecType {
   none,
   singleKeyAtIndex,
@@ -13,9 +14,15 @@ enum KeySpecType {
   streamsKeyword,
 }
 
+/// Key extraction metadata for a single Redis command.
 class CommandSpec {
+  /// Extraction strategy.
   final KeySpecType type;
+
+  /// Primary positional index used by the extraction strategy.
   final int? index;
+
+  /// Secondary positional index used by some strategies.
   final int? secondIndex;
 
   const CommandSpec._(this.type, [this.index, this.secondIndex]);
@@ -46,9 +53,12 @@ class CommandSpec {
   const CommandSpec.streamsKeyword() : this._(KeySpecType.streamsKeyword);
 }
 
+/// Static key-spec registry used by the cluster router.
 class ClusterCommandSpec {
+  /// Marker used for commands that do not carry keys.
   static const CommandSpec noKey = CommandSpec.none();
 
+  /// Command name to key extraction specification.
   static const Map<String, CommandSpec> specs = {
     'PING': noKey,
     'ECHO': noKey,
@@ -244,6 +254,7 @@ class ClusterCommandSpec {
     'PFMERGE': CommandSpec.keysFrom(1),
   };
 
+  /// Extracts the key arguments from a raw Redis command.
   static List<String> extractKeys(List<dynamic> command) {
     if (command.isEmpty) return const [];
     final cmd = command.first.toString().toUpperCase();

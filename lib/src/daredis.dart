@@ -1,5 +1,6 @@
 import '../daredis.dart';
 
+/// Standalone Redis client backed by a reusable connection pool.
 class Daredis extends RedisClient
     with
         RedisServerCommands,
@@ -19,6 +20,7 @@ class Daredis extends RedisClient
   bool _connected = false;
   bool _closed = false;
 
+  /// Creates a standalone client with pooled connections.
   Daredis({
     this.options = const ConnectionOptions(),
     int poolSize = 4,
@@ -73,9 +75,11 @@ class Daredis extends RedisClient
   @override
   bool get isClosed => _closed;
 
+  /// Runtime statistics for the underlying connection pool.
   PoolStats get poolStats => _pool.stats;
 
   @override
+  /// Warms up the pool by acquiring and validating a connection.
   Future<void> connect() async {
     if (_connected) return;
     await _pool.withResource((connection) async {
@@ -85,12 +89,14 @@ class Daredis extends RedisClient
   }
 
   @override
+  /// Closes the client and disposes the underlying connection pool.
   Future<void> close() async {
     _closed = true;
     await _pool.close();
   }
 
   @override
+  /// Sends a command using a pooled connection.
   Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) {
     ensureReady();
     return _pool.withResource((connection) async {
@@ -99,11 +105,13 @@ class Daredis extends RedisClient
     });
   }
 
+  /// Creates a pipeline helper that executes through this client.
   RedisPipeline pipeline() => RedisPipeline(
     (command, timeout) => sendCommand(command, timeout: timeout),
   );
 
   @override
+  /// Opens a dedicated pub/sub session using the client's connection options.
   Future<RedisPubSub> openPubSub({ReconnectPolicy? reconnectPolicy}) async {
     final pubsub = RedisPubSub.fromOptions(
       options.copyWith(
@@ -115,6 +123,7 @@ class Daredis extends RedisClient
   }
 
   @override
+  /// Opens a dedicated transaction session on a pinned connection.
   Future<RedisTransaction> openTransaction({
     ReconnectPolicy? reconnectPolicy,
   }) async {

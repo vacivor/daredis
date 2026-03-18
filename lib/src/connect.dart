@@ -7,8 +7,14 @@ import 'package:daredis/src/resp.dart';
 
 typedef PushMessageHandler = void Function(List<dynamic> message);
 
+/// Controls how a low-level connection retries after the socket closes.
 class ReconnectPolicy {
+  /// Maximum reconnect attempts before giving up.
+  ///
+  /// When `null`, reconnects continue indefinitely.
   final int? maxAttempts;
+
+  /// Delay between reconnect attempts.
   final Duration delay;
 
   const ReconnectPolicy({
@@ -17,15 +23,33 @@ class ReconnectPolicy {
   });
 }
 
+/// Single Redis socket connection with RESP encoding, decoding, and retries.
 class Connection {
+  /// Target host.
   final String host;
+
+  /// Target port.
   final int port;
+
+  /// Optional username for ACL authentication.
   final String? username;
+
+  /// Optional password for `AUTH`.
   final String? password;
+
+  /// Socket connect timeout.
   final Duration connectTimeout;
+
+  /// Default timeout used by [sendCommand].
   final Duration commandTimeout;
+
+  /// Whether to connect with TLS.
   final bool useSsl;
+
+  /// Reconnect behavior after disconnects.
   final ReconnectPolicy reconnectPolicy;
+
+  /// Optional handler for RESP3 push frames.
   final PushMessageHandler? pushHandler;
 
   final _decoder = RespDecoder();
@@ -49,6 +73,7 @@ class Connection {
     this.pushHandler,
   });
 
+  /// Creates a connection from reusable [ConnectionOptions].
   factory Connection.fromOptions(ConnectionOptions options) {
     return Connection(
       host: options.host,
@@ -63,6 +88,7 @@ class Connection {
     );
   }
 
+  /// Opens the socket and authenticates when credentials are configured.
   Future<void> connect() async {
     try {
       if (useSsl) {
@@ -91,8 +117,10 @@ class Connection {
     }
   }
 
+  /// Whether the underlying socket is currently open.
   bool get isConnected => _socket != null;
 
+  /// Connects lazily when the socket is not yet open.
   Future<void> ensureConnected() async {
     if (!isConnected) {
       await connect();
@@ -163,7 +191,7 @@ class Connection {
     }
   }
 
-  // 断开连接
+  /// Closes the socket without attempting to reconnect.
   Future<void> disconnect() async {
     await _socket?.close();
     _socket = null;
@@ -187,7 +215,7 @@ class Connection {
     }
   }
 
-  // 发送命令并获取结果
+  /// Sends a single Redis command and resolves with the decoded response.
   Future<dynamic> sendCommand(
     List<dynamic> command, {
     Duration? timeout,
@@ -214,6 +242,7 @@ class Connection {
     );
   }
 
+  /// Sends `HELLO` with optional authentication arguments.
   Future<dynamic> hello(int version, {String? password, String? username}) {
     return sendCommand([
       'HELLO',
@@ -223,15 +252,33 @@ class Connection {
   }
 }
 
+/// Immutable configuration for creating [Connection] instances.
 class ConnectionOptions {
+  /// Redis host.
   final String host;
+
+  /// Redis port.
   final int port;
+
+  /// Optional ACL username.
   final String? username;
+
+  /// Optional password for `AUTH`.
   final String? password;
+
+  /// Socket connect timeout.
   final Duration connectTimeout;
+
+  /// Default command timeout.
   final Duration commandTimeout;
+
+  /// Whether to use TLS sockets.
   final bool useSsl;
+
+  /// Reconnect behavior for newly created connections.
   final ReconnectPolicy reconnectPolicy;
+
+  /// Optional RESP3 push frame handler.
   final PushMessageHandler? pushHandler;
 
   const ConnectionOptions({
@@ -246,6 +293,7 @@ class ConnectionOptions {
     this.pushHandler,
   });
 
+  /// Returns a copy with the provided fields replaced.
   ConnectionOptions copyWith({
     String? host,
     int? port,

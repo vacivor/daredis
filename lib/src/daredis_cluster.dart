@@ -3,9 +3,15 @@ import 'package:daredis/src/exceptions.dart';
 
 import '../daredis.dart';
 
+/// Parsed `MOVED` or `ASK` redirect returned by a Redis cluster node.
 class ClusterRedirect {
+  /// Hash slot that triggered the redirect.
   final int slot;
+
+  /// Redirect target node.
   final ClusterNodeAddress address;
+
+  /// Whether the redirect is permanent (`MOVED`) rather than transient (`ASK`).
   final bool isMoved;
 
   const ClusterRedirect({
@@ -15,6 +21,7 @@ class ClusterRedirect {
   });
 }
 
+/// Parses a `host:port` or `[ipv6]:port` cluster node address.
 ClusterNodeAddress? parseClusterNodeAddress(String value) {
   if (value.startsWith('[')) {
     final endBracket = value.indexOf(']');
@@ -34,6 +41,7 @@ ClusterNodeAddress? parseClusterNodeAddress(String value) {
   return ClusterNodeAddress(host, port);
 }
 
+/// Parses a Redis error into a structured cluster redirect when possible.
 ClusterRedirect? parseClusterRedirect(Object error) {
   final message = error.toString();
   final movedIndex = message.indexOf('MOVED ');
@@ -51,6 +59,7 @@ ClusterRedirect? parseClusterRedirect(Object error) {
   return ClusterRedirect(slot: slot, address: address, isMoved: isMoved);
 }
 
+/// Whether an error indicates a retryable cluster condition.
 bool isRetryableClusterError(Object error) {
   final message = error.toString().toUpperCase();
   return message.contains('TRYAGAIN') ||
@@ -58,6 +67,7 @@ bool isRetryableClusterError(Object error) {
       message.contains('LOADING');
 }
 
+/// Whether an error indicates cluster routing needs to be refreshed.
 bool isClusterRoutingError(Object error) {
   final message = error.toString().toUpperCase();
   return message.contains('MOVED ') ||
@@ -67,27 +77,59 @@ bool isClusterRoutingError(Object error) {
       message.contains('CROSSSLOT');
 }
 
+/// Seed node used to bootstrap cluster topology discovery.
 class ClusterNode {
+  /// Seed host.
   final String host;
+
+  /// Seed port.
   final int port;
 
   const ClusterNode(this.host, this.port);
 }
 
+/// Configuration for [DaredisCluster].
 class ClusterOptions {
+  /// Seed nodes used to fetch initial slot metadata.
   final List<ClusterNode> seeds;
+
+  /// Base connection options applied to per-node connections.
   final ConnectionOptions connectionOptions;
+
+  /// Per-node connection pool size.
   final int nodePoolSize;
+
+  /// Maximum number of waiters allowed per node pool.
   final int? poolMaxWaiters;
+
+  /// Timeout while waiting for a pooled node connection.
   final Duration? poolAcquireTimeout;
+
+  /// How long idle node connections stay in the pool.
   final Duration? poolIdleTimeout;
+
+  /// Frequency used to evict idle node connections.
   final Duration? poolEvictionInterval;
+
+  /// Maximum attempts when creating node connections.
   final int poolCreateMaxAttempts;
+
+  /// Delay between failed node connection creation attempts.
   final Duration poolCreateRetryDelay;
+
+  /// Whether node pools use LIFO ordering.
   final bool poolUseLifo;
+
+  /// Maximum redirect hops per command.
   final int maxRedirects;
+
+  /// Maximum retries for retryable cluster errors.
   final int maxRetries;
+
+  /// Delay between retry attempts.
   final Duration retryDelay;
+
+  /// Optional reconnect policy override for node connections.
   final ReconnectPolicy? reconnectPolicy;
 
   const ClusterOptions({
@@ -108,6 +150,7 @@ class ClusterOptions {
   });
 }
 
+/// Redis Cluster client with slot-aware routing and per-node connection pools.
 class DaredisCluster extends RedisClusterClient
     with
         RedisServerCommands,
@@ -128,6 +171,7 @@ class DaredisCluster extends RedisClusterClient
   bool _connected = false;
   bool _closed = false;
 
+  /// Creates a cluster client.
   DaredisCluster({
     required this.options,
     int clientPoolSize = 4,
@@ -171,9 +215,11 @@ class DaredisCluster extends RedisClusterClient
   @override
   bool get isClosed => _closed;
 
+  /// Runtime statistics for the outer client pool.
   PoolStats get poolStats => _pool.stats;
 
   @override
+  /// Warms up the client by connecting one pooled cluster session.
   Future<void> connect() async {
     if (_connected) return;
     await _pool.withResource((client) async {
@@ -185,12 +231,14 @@ class DaredisCluster extends RedisClusterClient
   }
 
   @override
+  /// Closes the client and all underlying node pools.
   Future<void> close() async {
     _closed = true;
     await _pool.close();
   }
 
   @override
+  /// Sends a command through a slot-aware pooled cluster session.
   Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) {
     ensureReady();
     return _pool.withResource((client) async {
@@ -201,6 +249,7 @@ class DaredisCluster extends RedisClusterClient
     });
   }
 
+  /// Creates a cluster-aware pipeline helper.
   ClusterPipeline pipeline() => ClusterPipeline(
     (commands) => _pool.withResource((client) async {
       for (final command in commands) {
@@ -211,6 +260,7 @@ class DaredisCluster extends RedisClusterClient
   );
 
   @override
+  /// Opens a pub/sub session against a chosen cluster node.
   Future<RedisPubSub> openPubSub({ClusterNode? node}) async {
     if (options.seeds.isEmpty) {
       throw DaredisStateException('Cluster seeds cannot be empty');
@@ -227,6 +277,7 @@ class DaredisCluster extends RedisClusterClient
     return pubsub;
   }
 
+  /// Cluster transactions are intentionally unsupported.
   Future<RedisTransaction> openTransaction() {
     throw DaredisUnsupportedException(
       'Redis Cluster transactions are not supported by DaredisCluster. '

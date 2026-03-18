@@ -8,6 +8,8 @@ import 'package:daredis/src/exceptions.dart';
 import 'package:daredis/src/pubsub_message.dart';
 import 'package:daredis/src/resp.dart';
 
+/// Builds the `SUBSCRIBE` and `PSUBSCRIBE` commands needed to restore an
+/// existing pub/sub session after reconnecting.
 List<List<dynamic>> buildPubSubResubscribeCommands({
   required Iterable<String> channels,
   required Iterable<String> patterns,
@@ -26,14 +28,30 @@ List<List<dynamic>> buildPubSubResubscribeCommands({
   return commands;
 }
 
+/// Dedicated Redis pub/sub session bound to a single subscription socket.
 class RedisPubSub {
+  /// Target host.
   final String host;
+
+  /// Target port.
   final int port;
+
+  /// Optional ACL username.
   final String? username;
+
+  /// Optional password for `AUTH`.
   final String? password;
+
+  /// Socket connect timeout.
   final Duration connectTimeout;
+
+  /// Timeout used while waiting for subscribe acknowledgements.
   final Duration commandTimeout;
+
+  /// Whether to use TLS sockets.
   final bool useSsl;
+
+  /// Reconnect behavior for the subscription socket.
   final ReconnectPolicy reconnectPolicy;
 
   final _decoder = RespDecoder();
@@ -59,6 +77,7 @@ class RedisPubSub {
     this.reconnectPolicy = const ReconnectPolicy(),
   });
 
+  /// Creates a pub/sub session from reusable [ConnectionOptions].
   factory RedisPubSub.fromOptions(ConnectionOptions options) {
     return RedisPubSub(
       host: options.host,
@@ -72,16 +91,25 @@ class RedisPubSub {
     );
   }
 
+  /// Broadcast stream of all pub/sub frames exposed as typed messages.
   Stream<PubSubMessage> get messages => _pubSubController.stream;
 
+  /// Subscription acknowledgement frames such as `subscribe` and
+  /// `unsubscribe`.
   Stream<PubSubMessage> get subscriptionEvents =>
       messages.where((message) => message.isSubscriptionEvent);
 
+  /// Data-bearing frames such as `message` and `pmessage`.
   Stream<PubSubMessage> get dataMessages =>
       messages.where((message) => message.isDataMessage);
 
+  /// Alias for [messages].
   Stream<PubSubMessage> listen() => messages;
 
+  /// Waits for the next incoming message frame.
+  ///
+  /// When [ignoreSubscriptionMessages] is true, only published data messages
+  /// are considered. Returns `null` on timeout when [timeout] is provided.
   Future<PubSubMessage?> getMessage({
     Duration? timeout,
     bool ignoreSubscriptionMessages = false,
@@ -104,6 +132,7 @@ class RedisPubSub {
     );
   }
 
+  /// Opens the pub/sub socket and replays tracked subscriptions if needed.
   Future<void> connect() async {
     if (_closed) {
       _closed = false;
@@ -137,12 +166,15 @@ class RedisPubSub {
     }
   }
 
+  /// Whether the underlying socket is currently open.
   bool get isConnected => _socket != null;
 
+  /// Whether the session has been explicitly closed.
   bool get isClosed => _closed;
 
   bool _closed = false;
 
+  /// Connects lazily when the socket is not yet open.
   Future<void> ensureConnected() async {
     if (!isConnected) {
       await connect();
@@ -257,6 +289,7 @@ class RedisPubSub {
     _socket!.add(encoded);
   }
 
+  /// Subscribes to one or more channels.
   Future<void> subscribe(List<String> channels) async {
     if (channels.isEmpty) return;
     _ensureOpen();
@@ -276,6 +309,7 @@ class RedisPubSub {
     );
   }
 
+  /// Pattern-subscribes to one or more glob-style channel patterns.
   Future<void> psubscribe(List<String> patterns) async {
     if (patterns.isEmpty) return;
     _ensureOpen();
@@ -295,6 +329,7 @@ class RedisPubSub {
     );
   }
 
+  /// Unsubscribes from specific channels, or from all channels when omitted.
   Future<void> unsubscribe([List<String> channels = const []]) async {
     _ensureOpen();
     await ensureConnected();
@@ -317,6 +352,7 @@ class RedisPubSub {
     );
   }
 
+  /// Unsubscribes from specific patterns, or from all patterns when omitted.
   Future<void> punsubscribe([List<String> patterns = const []]) async {
     _ensureOpen();
     await ensureConnected();
@@ -339,11 +375,13 @@ class RedisPubSub {
     );
   }
 
+  /// Closes the socket without clearing the closed state.
   Future<void> disconnect() async {
     await _socket?.close();
     _socket = null;
   }
 
+  /// Permanently closes the session and clears tracked subscriptions.
   Future<void> close() async {
     _closed = true;
     _channels.clear();
