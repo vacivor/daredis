@@ -66,20 +66,30 @@ import 'package:daredis/daredis.dart';
 
 Future<void> main() async {
   final client = Daredis(
-    options: ConnectionOptions(
+    options: const ConnectionOptions(
       host: '127.0.0.1',
       port: 6379,
     ),
-    poolSize: 4,
   );
 
   await client.connect();
 
-  await client.set('user:1:name', 'alice');
-  final name = await client.get('user:1:name');
-  print(name); // alice
+  try {
+    const key = 'example:greeting';
 
-  await client.close();
+    await client.set(key, 'hello from daredis');
+    final value = await client.get(key);
+
+    print('Stored value: $value');
+
+    await client.hSet('example:user:1', 'name', 'alice');
+    await client.hSet('example:user:1', 'city', 'shanghai');
+    final user = await client.hGetAll('example:user:1');
+
+    print('User hash: $user');
+  } finally {
+    await client.close();
+  }
 }
 ```
 
