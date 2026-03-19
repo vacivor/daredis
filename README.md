@@ -34,7 +34,7 @@ Add `daredis` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  daredis: ^0.0.2
+  daredis: ^0.0.3
 ```
 
 Then run:
