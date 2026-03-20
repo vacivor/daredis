@@ -136,10 +136,10 @@ class Pool<T> {
   final ListQueue<_IdleItem<T>> _idle = ListQueue();
   final ListQueue<_PoolWaiter<T>> _waiters = ListQueue();
 
-  /// 记录当前正在创建的连接数量，防止超过 maxSize
+  /// Number of items currently being created.
   int _creating = 0;
 
-  /// 已经创建并管理的连接总数（包括 idle 和 inUse 以及正在创建中的）
+  /// Total managed items, including idle, in-use, and creating items.
   int _total = 0;
   bool _closed = false;
   Timer? _evictionTimer;
@@ -203,28 +203,28 @@ class Pool<T> {
       throw DaredisStateException('Pool is closed');
     }
 
-    // 1. 尝试从空闲队列获取
+    // 1. Try to reuse an idle item first.
     while (_idle.isNotEmpty) {
       final idleItem = _takeIdleItem();
       if (idleItem == null) {
         break;
       }
       if (_isIdleExpired(idleItem)) {
-        _disposeItem(idleItem.item); // 超时直接回收
+        _disposeItem(idleItem.item); // Dispose expired items immediately.
         continue;
       }
       if (await _isValid(idleItem.item, config.testOnBorrow)) {
         return idleItem.item;
       }
-      _disposeItem(idleItem.item); // 不等待销毁，继续尝试
+      _disposeItem(idleItem.item); // Keep looking after scheduling disposal.
     }
 
-    // 2. 尝试创建新连接
+    // 2. Create a new item if the pool has spare capacity.
     if (_total < config.maxSize) {
       return await _createNewItem();
     }
 
-    // 3. 队列已满，进入等待
+    // 3. Otherwise wait in the acquire queue.
     if (config.maxWaiters != null && _waiters.length >= config.maxWaiters!) {
       throw DaredisStateException('Pool wait queue is full');
     }
@@ -256,11 +256,11 @@ class Pool<T> {
 
     if (!await _isValid(item, config.testOnReturn)) {
       await _disposeItem(item);
-      _serveWaiters(); // 补位
+      _serveWaiters(); // Backfill capacity for queued waiters.
       return;
     }
 
-    // 如果有等待者，直接交给等待者
+    // Hand the item directly to a waiter when one exists.
     if (_waiters.isNotEmpty) {
       final idleItem = _IdleItem(item);
       if (_isIdleExpired(idleItem)) {
@@ -277,7 +277,7 @@ class Pool<T> {
       return;
     }
 
-    // 否则放入空闲队列
+    // Otherwise return the item to the idle queue.
     if (_idle.length < config.maxIdle) {
       final idleItem = _IdleItem(item);
       if (_isIdleExpired(idleItem)) {
@@ -292,7 +292,7 @@ class Pool<T> {
     }
   }
 
-  /// 在资源池中执行操作，并确保资源归还
+  /// Runs [action] with an acquired item and always releases it afterwards.
   Future<R> withResource<R>(
     Future<R> Function(T item) action, {
     Duration? acquireTimeout,
@@ -305,7 +305,7 @@ class Pool<T> {
     }
   }
 
-  /// 关闭连接池
+  /// Closes the pool and disposes all idle items.
   Future<void> close() async {
     _closed = true;
     _evictionTimer?.cancel();
@@ -322,7 +322,7 @@ class Pool<T> {
     for (final item in itemsToDispose) {
       await _disposeItem(item);
     }
-    // 注意：正在使用的连接由使用者在使用完 release 时发现 pool 已关闭而销毁
+    // In-use items are disposed later when their caller releases them.
   }
 
   Future<T> _createNewItem() async {
@@ -345,7 +345,7 @@ class Pool<T> {
 
     _isServingWaiters = true;
     try {
-      // 尝试用空闲资源满足等待者
+      // Try to satisfy waiters from idle items first.
       while (_waiters.isNotEmpty && _idle.isNotEmpty) {
         final idleItem = _takeIdleItem();
         if (idleItem == null) {
@@ -362,7 +362,7 @@ class Pool<T> {
         }
       }
 
-      // 如果还有等待者且没到上限，创建新资源
+      // Create new items for remaining waiters while capacity allows.
       while (_waiters.isNotEmpty && _total < config.maxSize) {
         try {
           final item = await _createNewItem();
@@ -390,7 +390,7 @@ class Pool<T> {
         await _dispose(item);
       }
     } catch (_) {
-      // 忽略销毁异常，避免影响连接池主流程
+      // Ignore disposal failures so pool shutdown and recycling can continue.
     }
   }
 
@@ -456,7 +456,7 @@ class Pool<T> {
           final item = await _createNewItem();
           _idle.addLast(_IdleItem(item));
         } catch (_) {
-          break; // 创建失败则停止补足
+          break; // Stop warming when item creation keeps failing.
         }
       }
     } finally {
@@ -477,7 +477,7 @@ class Pool<T> {
       final itemsToInspect = _idle.take(maxItems).toList();
 
       for (final idleItem in itemsToInspect) {
-        // 1. 检查超时
+        // 1. Evict expired items.
         if (config.idleTimeout != null) {
           if (now.difference(idleItem.lastActive) > config.idleTimeout!) {
             toRemove.add(idleItem);
@@ -485,7 +485,7 @@ class Pool<T> {
           }
         }
 
-        // 2. 检查有效性
+        // 2. Validate remaining idle items when configured.
         if (config.testWhileIdle && _validate != null) {
           if (!await _isValid(idleItem.item, true)) {
             toRemove.add(idleItem);
@@ -505,21 +505,48 @@ class Pool<T> {
   }
 }
 
-/// 连接池统计信息
+/// Snapshot of pool counters and recent maintenance timestamps.
 class PoolStats {
+  /// Total managed items.
   final int total;
+
+  /// Idle items currently available.
   final int idle;
+
+  /// Items currently checked out.
   final int inUse;
+
+  /// Items in the middle of asynchronous creation.
   final int creating;
+
+  /// Callers currently waiting to acquire an item.
   final int waiters;
+
+  /// Configured maximum number of managed items.
   final int maxSize;
+
+  /// Configured maximum idle items.
   final int maxIdle;
+
+  /// Configured minimum idle items.
   final int minIdle;
+
+  /// Total number of successfully created items.
   final int createdCount;
+
+  /// Total number of disposed items.
   final int disposedCount;
+
+  /// Total number of failed item creation attempts.
   final int createFailureCount;
+
+  /// Timestamp of the most recent eviction run, if any.
   final DateTime? lastEvictionAt;
+
+  /// Timestamp of the most recent creation failure, if any.
   final DateTime? lastCreateFailureAt;
+
+  /// Whether the pool has been closed.
   final bool isClosed;
 
   const PoolStats({
