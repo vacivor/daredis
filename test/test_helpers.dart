@@ -30,7 +30,9 @@ Future<void> deleteKeys(
 ) async {
   final existing = keys.where((key) => key.isNotEmpty).toList(growable: false);
   if (existing.isEmpty) return;
-  await client.sendCommand(['DEL', ...existing]);
+  for (final key in existing) {
+    await client.sendCommand(['DEL', key]);
+  }
 }
 
 Future<bool> isReachable(String host, int port) async {
