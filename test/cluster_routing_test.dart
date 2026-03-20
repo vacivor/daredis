@@ -74,6 +74,15 @@ void main() {
       );
     });
 
+    test('validateSameSlot allows a single key without special handling', () {
+      final slotCache = ClusterSlotCache();
+
+      expect(
+        () => ClusterCommandSpec.validateSameSlot(['orders:{42}'], slotCache),
+        returnsNormally,
+      );
+    });
+
     test('decodes binary keys into strings', () {
       final bytes = utf8.encode('user:{9}');
       expect(keyToString(bytes), 'user:{9}');

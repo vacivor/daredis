@@ -272,6 +272,29 @@ void main() {
       expect(await cluster.mGet([keyA, keyB]), ['1', '2']);
     });
 
+    test('cluster transaction routing key only selects the slot', timeout: integrationTestTimeout, () async {
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
+      }
+      final tag = '{${testKey('cluster-routing-key')}}';
+      final routingKey = 'daredis:test:cluster:tx:routing:$tag';
+      final actualKey = 'daredis:test:cluster:tx:actual:$tag';
+      final tx = await cluster.openTransaction(routingKey);
+
+      addTearDown(() => deleteKeys(cluster, [routingKey, actualKey]));
+      addTearDown(() async => tx.close());
+
+      expect(await tx.multi(), 'OK');
+      expect(await tx.sendCommand(['SET', actualKey, 'value']), 'QUEUED');
+      final replies = await tx.exec();
+
+      expect(replies, hasLength(1));
+      expect(await cluster.get(actualKey), 'value');
+    });
+
     test('geo hyperloglog and scripting commands work in one slot', timeout: integrationTestTimeout, () async {
       if (skipIfUnavailable(
         available,

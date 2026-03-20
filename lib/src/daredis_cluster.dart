@@ -1,3 +1,4 @@
+import 'package:daredis/src/cluster_command_policy.dart';
 import 'package:daredis/src/cluster_slots.dart';
 import 'package:daredis/src/exceptions.dart';
 
@@ -338,7 +339,11 @@ class RedisClusterTransaction extends RedisTransactionSession
   @override
   Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) async {
     ensureReady();
-    _validateCommandKeys(command);
+    ClusterCommandPolicy.validatePinnedSlot(
+      command,
+      slot: slot,
+      slotCache: _slotCache,
+    );
     await _connection.ensureConnected();
     try {
       return await _connection.sendCommand(command, timeout: timeout);
@@ -350,19 +355,6 @@ class RedisClusterTransaction extends RedisTransactionSession
         );
       }
       rethrow;
-    }
-  }
-
-  void _validateCommandKeys(List<dynamic> command) {
-    final keys = ClusterCommandSpec.extractKeys(command);
-    for (final key in keys) {
-      final nextSlot = _slotCache.slotForKey(key);
-      if (nextSlot != slot) {
-        throw RespException(
-          'CROSSSLOT Transaction is pinned to slot $slot but key "$key" '
-          'maps to slot $nextSlot',
-        );
-      }
     }
   }
 }
@@ -431,12 +423,12 @@ class _DaredisClusterConnection extends RedisClusterClient {
   @override
   Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) {
     ensureReady();
-    _validateCommandKeys(command);
+    ClusterCommandPolicy.validateSameSlot(command, _slotCache);
     return _sendWithRedirect(command, timeout: timeout, attempt: 0);
   }
 
   void validateCommandKeys(List<dynamic> command) {
-    _validateCommandKeys(command);
+    ClusterCommandPolicy.validateSameSlot(command, _slotCache);
   }
 
   Future<RedisClusterTransaction> openTransaction(String routingKey) async {
@@ -462,7 +454,7 @@ class _DaredisClusterConnection extends RedisClusterClient {
     Duration? timeout,
     required int attempt,
   }) async {
-    final key = _extractKey(command);
+    final key = ClusterCommandPolicy.firstKey(command);
     final pool = key == null ? _anyPool() : _poolForKey(key);
     try {
       return await pool.withResource(
@@ -606,17 +598,6 @@ class _DaredisClusterConnection extends RedisClusterClient {
     }
   }
 
-  String? _extractKey(List<dynamic> command) {
-    final keys = ClusterCommandSpec.extractKeys(command);
-    if (keys.isEmpty) return null;
-    return keys.first;
-  }
-
-  void _validateCommandKeys(List<dynamic> command) {
-    final keys = ClusterCommandSpec.extractKeys(command);
-    if (keys.length <= 1) return;
-    ClusterCommandSpec.validateSameSlot(keys, _slotCache);
-  }
 }
 
 class ClusterPipeline {

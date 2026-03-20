@@ -122,8 +122,7 @@ await cluster.close();
 ```
 
 Cluster transactions should also be scoped to one slot. Open them with a
-routing key
-that already carries the hash tag you want to pin:
+routing key that already carries the hash tag you want to pin:
 
 ```dart
 final tx = await cluster.openTransaction('cart:{42}:total');
@@ -137,6 +136,10 @@ try {
   await tx.close();
 }
 ```
+
+The routing key only selects the slot and node. Subsequent keyed commands do
+not need to include that exact key, but they must continue to target the same
+slot. The client does not emulate cross-slot transaction behavior.
 
 ## Client Model
 
@@ -174,6 +177,29 @@ The package models command availability through concrete client/session types.
 
 This keeps command availability aligned with the underlying connection model
 instead of exposing every command on every executor shape.
+
+### Cluster Multi-Key Rules
+
+`DaredisCluster` preserves native Redis Cluster command semantics.
+
+- Multi-key commands work when all keys hash to the same slot
+- Cross-slot multi-key commands fail early on the client
+- The client does not scatter, merge, or emulate cross-slot command behavior
+- The same rule applies inside cluster transactions opened with a routing key
+
+Use hash tags such as `{42}` when related keys must be used together:
+
+```dart
+await cluster.mSet({
+  'cart:{42}:total': '199',
+  'cart:{42}:items': '3',
+});
+
+print(await cluster.mGet([
+  'cart:{42}:total',
+  'cart:{42}:items',
+]));
+```
 
 ## Connection Options
 
@@ -246,8 +272,9 @@ try {
 }
 ```
 
-`DaredisCluster` intentionally does not support transactions. If you need
-`WATCH/MULTI/EXEC`, use a direct `Daredis` client against a single Redis node.
+`DaredisCluster` supports transactions only as explicit single-slot sessions.
+Open them with a routing key so the session can pin itself to one slot and one
+node.
 
 ### Pub/Sub
 
