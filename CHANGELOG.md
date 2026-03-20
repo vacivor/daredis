@@ -1,3 +1,9 @@
+## 0.0.4
+
+- Added slot-routed transactions for Redis Cluster via `openTransaction(String routingKey)`.
+- Enforced single-slot validation for cluster transaction sessions.
+- Fixed cluster test cleanup to avoid cross-slot multi-key deletes.
+
 ## 0.0.3
 
 - Added a publish-friendly `example/example.dart` entry example.
