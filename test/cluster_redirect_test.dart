@@ -1,5 +1,5 @@
 import 'package:daredis/src/cluster_slots.dart';
-import 'package:daredis/src/daredis_cluster.dart';
+import 'package:daredis/src/cluster_redirect.dart';
 import 'package:test/test.dart';
 
 void main() {
