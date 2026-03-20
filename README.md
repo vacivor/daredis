@@ -117,7 +117,24 @@ Future<void> main() async {
   await cluster.set('cart:{42}:total', '199');
   print(await cluster.get('cart:{42}:total'));
 
-  await cluster.close();
+await cluster.close();
+}
+```
+
+Cluster transactions should also be scoped to one slot. Open them with a
+routing key
+that already carries the hash tag you want to pin:
+
+```dart
+final tx = await cluster.openTransaction('cart:{42}:total');
+try {
+  await tx.watch(['cart:{42}:total', 'cart:{42}:items']);
+  await tx.multi();
+  await tx.sendCommand(['SET', 'cart:{42}:total', '199']);
+  await tx.sendCommand(['SET', 'cart:{42}:items', '3']);
+  print(await tx.exec());
+} finally {
+  await tx.close();
 }
 ```
 

@@ -277,12 +277,93 @@ class DaredisCluster extends RedisClusterClient
     return pubsub;
   }
 
-  /// Cluster transactions are intentionally unsupported.
-  Future<RedisTransaction> openTransaction() {
-    throw DaredisUnsupportedException(
-      'Redis Cluster transactions are not supported by DaredisCluster. '
-      'Use a direct single-node client if you need WATCH/MULTI/EXEC semantics.',
-    );
+  /// Opens a transaction pinned to the slot derived from [routingKey].
+  ///
+  /// All subsequent keyed commands issued through the returned session must
+  /// target the same Redis Cluster slot.
+  Future<RedisClusterTransaction> openTransaction(String routingKey) {
+    ensureReady();
+    return _pool.withResource((client) async {
+      if (!client.isConnected) {
+        await client.connect();
+      }
+      return client.openTransaction(routingKey);
+    });
+  }
+}
+
+/// Dedicated cluster transaction session pinned to one slot and one node.
+class RedisClusterTransaction extends RedisTransactionSession
+    with
+        RedisServerCommands,
+        RedisStringCommands,
+        RedisKeyCommands,
+        RedisListCommands,
+        RedisHashCommands,
+        RedisSetCommands,
+        RedisSortedSetCommands,
+        RedisStreamCommands,
+        RedisScriptingCommands,
+        RedisGeoCommands,
+        RedisHyperLogLogCommands,
+        RedisTransactionCommands {
+  final Connection _connection;
+  final ClusterSlotCache _slotCache = ClusterSlotCache();
+  final int slot;
+  final ClusterNodeAddress nodeAddress;
+  bool _closed = false;
+
+  RedisClusterTransaction._(this._connection, this.slot, this.nodeAddress);
+
+  @override
+  bool get isConnected => _connection.isConnected;
+
+  @override
+  bool get isClosed => _closed;
+
+  @override
+  Future<void> connect() async {
+    if (_closed) {
+      _closed = false;
+    }
+    await _connection.connect();
+  }
+
+  @override
+  Future<void> close() async {
+    _closed = true;
+    await _connection.disconnect();
+  }
+
+  @override
+  Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) async {
+    ensureReady();
+    _validateCommandKeys(command);
+    await _connection.ensureConnected();
+    try {
+      return await _connection.sendCommand(command, timeout: timeout);
+    } catch (error) {
+      if (isClusterRoutingError(error)) {
+        throw DaredisClusterException(
+          'Cluster transaction for slot $slot on $nodeAddress can no longer '
+          'continue: $error',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  void _validateCommandKeys(List<dynamic> command) {
+    final keys = ClusterCommandSpec.extractKeys(command);
+    for (final key in keys) {
+      final nextSlot = _slotCache.slotForKey(key);
+      if (nextSlot != slot) {
+        throw RespException(
+          'CROSSSLOT Transaction is pinned to slot $slot but key "$key" '
+          'maps to slot $nextSlot',
+        );
+      }
+    }
   }
 }
 
@@ -358,6 +439,24 @@ class _DaredisClusterConnection extends RedisClusterClient {
     _validateCommandKeys(command);
   }
 
+  Future<RedisClusterTransaction> openTransaction(String routingKey) async {
+    final slot = _slotCache.slotForKey(routingKey);
+    var node = _slotCache.nodeForSlot(slot);
+    if (node == null) {
+      await _refreshSlots();
+      node = _slotCache.nodeForSlot(slot);
+    }
+    if (node == null) {
+      throw DaredisClusterException(
+        'Unable to resolve a cluster node for routing key "$routingKey" in slot $slot',
+      );
+    }
+
+    final connection = Connection.fromOptions(_optionsForAddress(node));
+    await connection.connect();
+    return RedisClusterTransaction._(connection, slot, node);
+  }
+
   Future<dynamic> _sendWithRedirect(
     List<dynamic> command, {
     Duration? timeout,
@@ -406,13 +505,7 @@ class _DaredisClusterConnection extends RedisClusterClient {
   void _buildPoolsFromSlots() {
     for (final node in _slotCache.uniqueNodes()) {
       _pools.putIfAbsent(node, () {
-        final opts = options.connectionOptions.copyWith(
-          host: node.host,
-          port: node.port,
-          reconnectPolicy:
-              options.reconnectPolicy ??
-              options.connectionOptions.reconnectPolicy,
-        );
+        final opts = _optionsForAddress(node);
         return Pool<Connection>(
           config: PoolConfig(
             maxSize: options.nodePoolSize,
@@ -464,13 +557,7 @@ class _DaredisClusterConnection extends RedisClusterClient {
 
   Pool<Connection> _poolForAddress(ClusterNodeAddress address) {
     return _pools.putIfAbsent(address, () {
-      final opts = options.connectionOptions.copyWith(
-        host: address.host,
-        port: address.port,
-        reconnectPolicy:
-            options.reconnectPolicy ??
-            options.connectionOptions.reconnectPolicy,
-      );
+      final opts = _optionsForAddress(address);
       return Pool<Connection>(
         config: PoolConfig(
           maxSize: options.nodePoolSize,
@@ -490,6 +577,16 @@ class _DaredisClusterConnection extends RedisClusterClient {
         dispose: (connection) => connection.disconnect(),
       );
     });
+  }
+
+  ConnectionOptions _optionsForAddress(ClusterNodeAddress address) {
+    return options.connectionOptions.copyWith(
+      host: address.host,
+      port: address.port,
+      reconnectPolicy:
+          options.reconnectPolicy ??
+          options.connectionOptions.reconnectPolicy,
+    );
   }
 
   Future<void> _refreshSlots({ClusterNodeAddress? hint}) async {

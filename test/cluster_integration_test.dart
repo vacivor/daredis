@@ -239,18 +239,37 @@ void main() {
       );
     });
 
-    test('transactions are explicitly unsupported', timeout: integrationTestTimeout, () async {
+    test('single-slot transactions can run on a pinned cluster node', timeout: integrationTestTimeout, () async {
       if (skipIfUnavailable(
         available,
         'Redis Cluster is not reachable at $clusterHost:$clusterPort',
       )) {
         return;
       }
+      final tag = '{${testKey('cluster-tx')}}';
+      final keyA = 'daredis:test:cluster:tx:a:$tag';
+      final keyB = 'daredis:test:cluster:tx:b:$tag';
+      final crossSlotKey = 'daredis:test:cluster:tx:other:{${testKey('cluster-tx-other')}}';
+      final tx = await cluster.openTransaction(keyA);
+
+      addTearDown(() => deleteKeys(cluster, [keyA, keyB, crossSlotKey]));
+      addTearDown(() async => tx.close());
 
       expect(
-        () => cluster.openTransaction(),
-        throwsA(isA<DaredisUnsupportedException>()),
+        () => tx.watch([keyA, keyB]),
+        returnsNormally,
       );
+      expect(await tx.watch([keyA, keyB]), 'OK');
+      expect(await tx.multi(), 'OK');
+      expect(await tx.sendCommand(['SET', keyA, '1']), 'QUEUED');
+      expect(await tx.sendCommand(['SET', keyB, '2']), 'QUEUED');
+      expect(
+        () => tx.sendCommand(['MGET', keyA, crossSlotKey]),
+        throwsA(isA<RespException>()),
+      );
+      final replies = await tx.exec();
+      expect(replies, hasLength(2));
+      expect(await cluster.mGet([keyA, keyB]), ['1', '2']);
     });
 
     test('geo hyperloglog and scripting commands work in one slot', timeout: integrationTestTimeout, () async {
