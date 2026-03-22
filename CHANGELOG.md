@@ -1,6 +1,5 @@
 ## 0.0.5
 
-- Added slot-routed Redis Cluster transactions via `openTransaction(String routingKey)`.
 - Extracted cluster command policy and redirect helpers into dedicated internal modules.
 - Clarified native Redis Cluster multi-key rules in documentation and tests.
 
