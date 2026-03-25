@@ -1,3 +1,20 @@
+## 0.1.0
+
+### Breaking changes
+
+- Removed `DaredisCluster.clientPoolSize`. Cluster clients now use one slot-aware router with per-node pools, so `nodePoolSize` is the concurrency knob to configure.
+- Changed pipeline execution to run on a single connection. On Redis Cluster, all keyed commands in one pipeline must now route to the same node.
+- Made `RedisPubSub.close()` terminal. Closing a pub/sub session now completes its message stream and the same session cannot be reopened.
+- Made `RedisTransaction` and `RedisClusterTransaction` single-use after `close()`. Open a fresh session with `openTransaction()` for the next transaction.
+
+### Improvements
+
+- Tightened low-level connection lifecycle handling around idempotent `connect()`, manual disconnect, and auth error propagation.
+
+### Docs
+
+- Refreshed README, examples, and package-level docs to match the updated client and session semantics.
+
 ## 0.0.5
 
 - Added slot-routed Redis Cluster transactions via `openTransaction(String routingKey)`.
