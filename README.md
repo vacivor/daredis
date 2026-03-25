@@ -281,6 +281,9 @@ try {
 Open them with a routing key so the session can pin itself to one slot and one
 node.
 
+Transaction sessions are single-use. After `close()`, open a fresh session
+with `openTransaction()` instead of reconnecting the old one.
+
 ### Pub/Sub
 
 Pub/Sub also uses a dedicated connection.
