@@ -10,8 +10,13 @@ enum KeySpecType {
   keysUntilLast,
   keyValuePairsFrom,
   numKeysAtIndex,
+  numKeyValuePairsAtIndex,
   numKeysWithDest,
   streamsKeyword,
+  sortStoreKeyword,
+  migrateKeys,
+  memorySubcommand,
+  objectSubcommand,
 }
 
 /// Key extraction metadata for a single Redis command.
@@ -47,10 +52,22 @@ class CommandSpec {
   const CommandSpec.numKeysAt(int index)
     : this._(KeySpecType.numKeysAtIndex, index);
 
+  const CommandSpec.numKeyValuePairsAt(int index)
+    : this._(KeySpecType.numKeyValuePairsAtIndex, index);
+
   const CommandSpec.numKeysWithDest(int destIndex, int numKeysIndex)
     : this._(KeySpecType.numKeysWithDest, destIndex, numKeysIndex);
 
   const CommandSpec.streamsKeyword() : this._(KeySpecType.streamsKeyword);
+
+  const CommandSpec.sortStoreKeyword()
+    : this._(KeySpecType.sortStoreKeyword);
+
+  const CommandSpec.migrateKeys() : this._(KeySpecType.migrateKeys);
+
+  const CommandSpec.memorySubcommand() : this._(KeySpecType.memorySubcommand);
+
+  const CommandSpec.objectSubcommand() : this._(KeySpecType.objectSubcommand);
 }
 
 /// Static key-spec registry used by the cluster router.
@@ -86,8 +103,9 @@ class ClusterCommandSpec {
     'FUNCTION': noKey,
     'PUBSUB': noKey,
     'MONITOR': noKey,
-    'MEMORY': CommandSpec.singleKeyAt(2),
-    'OBJECT': CommandSpec.singleKeyAt(2),
+    'ASKING': noKey,
+    'MEMORY': CommandSpec.memorySubcommand(),
+    'OBJECT': CommandSpec.objectSubcommand(),
 
     'GET': CommandSpec.singleKeyAt(1),
     'SET': CommandSpec.singleKeyAt(1),
@@ -119,6 +137,7 @@ class ClusterCommandSpec {
     'UNLINK': CommandSpec.keysFrom(1),
     'MGET': CommandSpec.keysFrom(1),
     'MSET': CommandSpec.keyValuePairsFrom(1),
+    'MSETEX': CommandSpec.numKeyValuePairsAt(1),
     'MSETNX': CommandSpec.keyValuePairsFrom(1),
     'EXISTS': CommandSpec.keysFrom(1),
     'TOUCH': CommandSpec.keysFrom(1),
@@ -133,9 +152,12 @@ class ClusterCommandSpec {
     'PTTL': CommandSpec.singleKeyAt(1),
     'PERSIST': CommandSpec.singleKeyAt(1),
     'TYPE': CommandSpec.singleKeyAt(1),
+    'SORT': CommandSpec.sortStoreKeyword(),
+    'SORT_RO': CommandSpec.singleKeyAt(1),
     'RENAME': CommandSpec.twoKeysAt(1),
     'RENAMENX': CommandSpec.twoKeysAt(1),
     'MOVE': CommandSpec.singleKeyAt(1),
+    'MIGRATE': CommandSpec.migrateKeys(),
     'COPY': CommandSpec.twoKeysAt(1),
     'DUMP': CommandSpec.singleKeyAt(1),
     'RESTORE': CommandSpec.singleKeyAt(1),
@@ -156,7 +178,9 @@ class ClusterCommandSpec {
     'HSCAN': CommandSpec.singleKeyAt(1),
 
     'LPUSH': CommandSpec.singleKeyAt(1),
+    'LPUSHX': CommandSpec.singleKeyAt(1),
     'RPUSH': CommandSpec.singleKeyAt(1),
+    'RPUSHX': CommandSpec.singleKeyAt(1),
     'LPOP': CommandSpec.singleKeyAt(1),
     'RPOP': CommandSpec.singleKeyAt(1),
     'RPOPLPUSH': CommandSpec.twoKeysAt(1),
@@ -165,12 +189,18 @@ class ClusterCommandSpec {
     'LLEN': CommandSpec.singleKeyAt(1),
     'LRANGE': CommandSpec.singleKeyAt(1),
     'LINDEX': CommandSpec.singleKeyAt(1),
+    'LINSERT': CommandSpec.singleKeyAt(1),
+    'LPOS': CommandSpec.singleKeyAt(1),
     'LSET': CommandSpec.singleKeyAt(1),
     'LTRIM': CommandSpec.singleKeyAt(1),
     'LREM': CommandSpec.singleKeyAt(1),
     'BLPOP': CommandSpec.keysUntilLast(1),
     'BRPOP': CommandSpec.keysUntilLast(1),
     'BRPOPLPUSH': CommandSpec.twoKeysAt(1),
+    'BZPOPMIN': CommandSpec.keysUntilLast(1),
+    'BZPOPMAX': CommandSpec.keysUntilLast(1),
+    'LMPOP': CommandSpec.numKeysAt(1),
+    'BLMPOP': CommandSpec.numKeysAt(2),
 
     'SADD': CommandSpec.singleKeyAt(1),
     'SREM': CommandSpec.singleKeyAt(1),
@@ -194,7 +224,10 @@ class ClusterCommandSpec {
     'ZCARD': CommandSpec.singleKeyAt(1),
     'ZCOUNT': CommandSpec.singleKeyAt(1),
     'ZRANGE': CommandSpec.singleKeyAt(1),
+    'ZRANGESTORE': CommandSpec.twoKeysAt(1),
+    'ZRANDMEMBER': CommandSpec.singleKeyAt(1),
     'ZREVRANGE': CommandSpec.singleKeyAt(1),
+    'ZREVRANGEBYLEX': CommandSpec.singleKeyAt(1),
     'ZRANGEBYSCORE': CommandSpec.singleKeyAt(1),
     'ZREVRANGEBYSCORE': CommandSpec.singleKeyAt(1),
     'ZRANK': CommandSpec.singleKeyAt(1),
@@ -211,11 +244,14 @@ class ClusterCommandSpec {
     'ZRANGEBYLEX': CommandSpec.singleKeyAt(1),
     'ZSCAN': CommandSpec.singleKeyAt(1),
     'ZINTER': CommandSpec.numKeysAt(1),
+    'ZINTERCARD': CommandSpec.numKeysAt(1),
     'ZUNION': CommandSpec.numKeysAt(1),
     'ZDIFF': CommandSpec.numKeysAt(1),
     'ZINTERSTORE': CommandSpec.numKeysWithDest(1, 2),
     'ZUNIONSTORE': CommandSpec.numKeysWithDest(1, 2),
     'ZDIFFSTORE': CommandSpec.numKeysWithDest(1, 2),
+    'ZMPOP': CommandSpec.numKeysAt(1),
+    'BZMPOP': CommandSpec.numKeysAt(2),
 
     'GEOADD': CommandSpec.singleKeyAt(1),
     'GEODIST': CommandSpec.singleKeyAt(1),
@@ -242,16 +278,20 @@ class ClusterCommandSpec {
     'XCLAIM': CommandSpec.singleKeyAt(1),
     'XAUTOCLAIM': CommandSpec.singleKeyAt(1),
     'XINFO': CommandSpec.singleKeyAt(2),
+    'XSETID': CommandSpec.singleKeyAt(1),
 
     'EVAL': CommandSpec.numKeysAt(2),
     'EVALSHA': CommandSpec.numKeysAt(2),
     'EVAL_RO': CommandSpec.numKeysAt(2),
     'EVALSHA_RO': CommandSpec.numKeysAt(2),
+    'FCALL': CommandSpec.numKeysAt(2),
+    'FCALL_RO': CommandSpec.numKeysAt(2),
 
     'BITOP': CommandSpec.keysFrom(2),
     'PFADD': CommandSpec.singleKeyAt(1),
     'PFCOUNT': CommandSpec.keysFrom(1),
     'PFMERGE': CommandSpec.keysFrom(1),
+    'RESTORE-ASKING': CommandSpec.singleKeyAt(1),
   };
 
   /// Extracts the key arguments from a raw Redis command.
@@ -259,12 +299,7 @@ class ClusterCommandSpec {
     if (command.isEmpty) return const [];
     final cmd = command.first.toString().toUpperCase();
     final spec = specs[cmd];
-    if (spec == null) {
-      if (command.length >= 2) {
-        return [keyToString(command[1])];
-      }
-      return const [];
-    }
+    if (spec == null) return const [];
     switch (spec.type) {
       case KeySpecType.none:
         return const [];
@@ -282,6 +317,8 @@ class ClusterCommandSpec {
         return _keysFromPairs(command, spec.index!);
       case KeySpecType.numKeysAtIndex:
         return _keysFromNumKeys(command, spec.index!);
+      case KeySpecType.numKeyValuePairsAtIndex:
+        return _keysFromNumKeyValuePairs(command, spec.index!);
       case KeySpecType.numKeysWithDest:
         return _keysFromNumKeysWithDest(
           command,
@@ -290,6 +327,14 @@ class ClusterCommandSpec {
         );
       case KeySpecType.streamsKeyword:
         return _keysAfterStreams(command);
+      case KeySpecType.sortStoreKeyword:
+        return _keysForSort(command);
+      case KeySpecType.migrateKeys:
+        return _keysForMigrate(command);
+      case KeySpecType.memorySubcommand:
+        return _keysForMemory(command);
+      case KeySpecType.objectSubcommand:
+        return _keysForObject(command);
     }
   }
 
@@ -335,6 +380,24 @@ class ClusterCommandSpec {
         .toList();
   }
 
+  static List<String> _keysFromNumKeyValuePairs(
+    List<dynamic> command,
+    int index,
+  ) {
+    if (command.length <= index) return const [];
+    final numKeys = _parseInt(command[index]);
+    if (numKeys <= 0) return const [];
+    final start = index + 1;
+    final end = start + (numKeys * 2);
+    if (command.length < end) return const [];
+
+    final keys = <String>[];
+    for (var i = start; i < end; i += 2) {
+      keys.add(keyToString(command[i]));
+    }
+    return keys;
+  }
+
   static List<String> _keysFromNumKeysWithDest(
     List<dynamic> command,
     int destIndex,
@@ -363,6 +426,60 @@ class ClusterCommandSpec {
         .sublist(streamsIndex + 1, streamsIndex + 1 + keyCount)
         .map((value) => keyToString(value))
         .toList();
+  }
+
+  static List<String> _keysForSort(List<dynamic> command) {
+    final keys = _keyAt(command, 1);
+    if (keys.isEmpty) return const [];
+
+    for (var i = 2; i < command.length - 1; i++) {
+      if (command[i].toString().toUpperCase() == 'STORE') {
+        keys.add(keyToString(command[i + 1]));
+        break;
+      }
+    }
+    return keys;
+  }
+
+  static List<String> _keysForMigrate(List<dynamic> command) {
+    if (command.length <= 3) return const [];
+
+    final directKey = keyToString(command[3]);
+    if (directKey.isNotEmpty) {
+      return [directKey];
+    }
+
+    final keysIndex = command.indexWhere(
+      (item) => item.toString().toUpperCase() == 'KEYS',
+    );
+    if (keysIndex == -1 || keysIndex + 1 >= command.length) {
+      return const [];
+    }
+    return command
+        .sublist(keysIndex + 1)
+        .map((value) => keyToString(value))
+        .toList();
+  }
+
+  static List<String> _keysForMemory(List<dynamic> command) {
+    if (command.length <= 2) return const [];
+    final subcommand = command[1].toString().toUpperCase();
+    if (subcommand != 'USAGE') return const [];
+    return [keyToString(command[2])];
+  }
+
+  static List<String> _keysForObject(List<dynamic> command) {
+    if (command.length <= 2) return const [];
+    final subcommand = command[1].toString().toUpperCase();
+    switch (subcommand) {
+      case 'ENCODING':
+      case 'FREQ':
+      case 'IDLETIME':
+      case 'REFCOUNT':
+        return [keyToString(command[2])];
+      default:
+        return const [];
+    }
   }
 
   static void validateSameSlot(List<String> keys, ClusterSlotCache slotCache) {

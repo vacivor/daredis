@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:daredis/src/cluster_command_spec.dart';
+import 'package:daredis/src/cluster_command_policy.dart';
 import 'package:daredis/src/cluster_slots.dart';
 import 'package:daredis/src/exceptions.dart';
 import 'package:test/test.dart';
@@ -11,6 +12,20 @@ void main() {
       expect(
         ClusterCommandSpec.extractKeys(['MSET', 'a', '1', 'b', '2']),
         ['a', 'b'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'MSETEX',
+          2,
+          'session:{1}',
+          'a',
+          'profile:{1}',
+          'b',
+          'EX',
+          60,
+        ]),
+        ['session:{1}', 'profile:{1}'],
       );
 
       expect(
@@ -41,6 +56,238 @@ void main() {
       ]);
 
       expect(keys, ['orders:{42}', 'payments:{42}']);
+    });
+
+    test('extracts keys from blocking multi-key pop commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'BZPOPMIN',
+          'scores:{1}',
+          'scores:{1}:backup',
+          0,
+        ]),
+        ['scores:{1}', 'scores:{1}:backup'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'BZMPOP',
+          0,
+          2,
+          'scores:{1}',
+          'scores:{1}:backup',
+          'MIN',
+        ]),
+        ['scores:{1}', 'scores:{1}:backup'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'BLMPOP',
+          0,
+          2,
+          'jobs:{1}',
+          'jobs:{1}:backup',
+          'LEFT',
+          'COUNT',
+          2,
+        ]),
+        ['jobs:{1}', 'jobs:{1}:backup'],
+      );
+    });
+
+    test('extracts keys from newer numkeys zset and list commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'LMPOP',
+          2,
+          'jobs:{7}',
+          'jobs:{7}:backup',
+          'LEFT',
+        ]),
+        ['jobs:{7}', 'jobs:{7}:backup'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'ZMPOP',
+          2,
+          'leaderboard:{7}',
+          'leaderboard:{7}:backup',
+          'MAX',
+        ]),
+        ['leaderboard:{7}', 'leaderboard:{7}:backup'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'ZINTERCARD',
+          2,
+          'set:{7}',
+          'other:{7}',
+        ]),
+        ['set:{7}', 'other:{7}'],
+      );
+    });
+
+    test('extracts source and store keys from sort commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'SORT',
+          'jobs:{1}',
+          'ALPHA',
+          'STORE',
+          'jobs:{1}:sorted',
+        ]),
+        ['jobs:{1}', 'jobs:{1}:sorted'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'SORT_RO',
+          'jobs:{1}',
+          'ALPHA',
+        ]),
+        ['jobs:{1}'],
+      );
+    });
+
+    test('extracts keys from memory and object subcommands only when needed', () {
+      expect(
+        ClusterCommandSpec.extractKeys(['MEMORY', 'USAGE', 'cache:{1}']),
+        ['cache:{1}'],
+      );
+      expect(ClusterCommandSpec.extractKeys(['MEMORY', 'DOCTOR']), isEmpty);
+
+      expect(
+        ClusterCommandSpec.extractKeys(['OBJECT', 'ENCODING', 'cache:{1}']),
+        ['cache:{1}'],
+      );
+      expect(ClusterCommandSpec.extractKeys(['OBJECT', 'HELP']), isEmpty);
+    });
+
+    test('extracts direct and KEYS-style migrate keys', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'MIGRATE',
+          '127.0.0.1',
+          6379,
+          'user:{1}',
+          0,
+          5000,
+        ]),
+        ['user:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'MIGRATE',
+          '127.0.0.1',
+          6379,
+          '',
+          0,
+          5000,
+          'KEYS',
+          'user:{1}',
+          'profile:{1}',
+        ]),
+        ['user:{1}', 'profile:{1}'],
+      );
+    });
+
+    test('does not guess keys for unknown commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'SOMEFUTURECOMMAND',
+          'library.fn',
+          1,
+          'user:{1}',
+        ]),
+        isEmpty,
+      );
+    });
+
+    test('reports whether a command has a known cluster spec', () {
+      expect(ClusterCommandPolicy.hasKnownSpec(['GET', 'user:{1}']), isTrue);
+      expect(
+        ClusterCommandPolicy.hasKnownSpec(['SOMEFUTURECOMMAND', 'user:{1}']),
+        isFalse,
+      );
+    });
+
+    test('extracts keys from function calls and zrangestore', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'FCALL',
+          'library.fn',
+          2,
+          'user:{1}',
+          'profile:{1}',
+          'arg1',
+        ]),
+        ['user:{1}', 'profile:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'FCALL_RO',
+          'library.read_only',
+          1,
+          'user:{1}',
+        ]),
+        ['user:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'ZRANGESTORE',
+          'leaderboard:{1}:top',
+          'leaderboard:{1}',
+          0,
+          9,
+        ]),
+        ['leaderboard:{1}:top', 'leaderboard:{1}'],
+      );
+    });
+
+    test('extracts keys from additional single-key and internal commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'LINSERT',
+          'jobs:{1}',
+          'BEFORE',
+          'pivot',
+          'value',
+        ]),
+        ['jobs:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys(['LPOS', 'jobs:{1}', 'value']),
+        ['jobs:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys(['ZRANDMEMBER', 'leaderboard:{1}', 2]),
+        ['leaderboard:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys(['XSETID', 'stream:{1}', '0-0']),
+        ['stream:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'RESTORE-ASKING',
+          'cache:{1}',
+          0,
+          'payload',
+        ]),
+        ['cache:{1}'],
+      );
+
+      expect(ClusterCommandSpec.extractKeys(['ASKING']), isEmpty);
     });
 
     test('hash tags route related keys to the same slot', () {

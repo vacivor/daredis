@@ -292,6 +292,23 @@ void main() {
       );
     });
 
+    test('pipeline rejects raw commands without a known cluster spec', timeout: integrationTestTimeout, () async {
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
+      }
+
+      final pipeline = cluster.pipeline();
+      pipeline.add(['SOMEFUTURECOMMAND', 'user:{1}']);
+
+      await expectLater(
+        pipeline.execute(),
+        throwsA(isA<DaredisUnsupportedException>()),
+      );
+    });
+
     test('single-slot transactions can run on a pinned cluster node', timeout: integrationTestTimeout, () async {
       if (skipIfUnavailable(
         available,
@@ -346,6 +363,24 @@ void main() {
 
       expect(replies, hasLength(1));
       expect(await cluster.get(actualKey), 'value');
+    });
+
+    test('cluster transactions reject raw commands without a known cluster spec', timeout: integrationTestTimeout, () async {
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
+      }
+
+      final key = 'daredis:test:cluster:tx:unknown:{${testKey('cluster-tx-unknown')}}';
+      final tx = await cluster.openTransaction(key);
+      addTearDown(() async => tx.close());
+
+      await expectLater(
+        tx.sendCommand(['SOMEFUTURECOMMAND', key]),
+        throwsA(isA<DaredisUnsupportedException>()),
+      );
     });
 
     test('closed cluster transaction sessions cannot be reopened', timeout: integrationTestTimeout, () async {

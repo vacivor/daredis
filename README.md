@@ -571,6 +571,9 @@ print(reply);
 
 This is intentionally kept available, but for readability and long-term
 maintainability it is better to prefer the typed helpers when they exist.
+On `DaredisCluster`, typed helpers are also preferred because cluster routing
+can only pre-validate commands with known key specs; unknown raw commands may
+fall back to server-side redirects instead of local slot checks.
 
 ## Supported High-Level Areas
 

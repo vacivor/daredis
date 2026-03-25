@@ -262,7 +262,7 @@ mixin RedisStringCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
-  /// Always throws because `MSETEX` is not a Redis command.
+  /// Sets multiple string key/value pairs atomically with shared expiry options.
   Future<int> mSetEx(
     Map<String, String> keyValues, {
     bool? nx,
@@ -273,8 +273,17 @@ mixin RedisStringCommands on RedisCommandExecutor {
     int? pxAt,
     bool? keepTtl,
   }) async {
-    throw DaredisUnsupportedException(
-      'MSETEX is not a Redis command. Use SET with EX/PX for each key.',
-    );
+    final args = <dynamic>['MSETEX', keyValues.length];
+    keyValues.forEach((key, value) => args.addAll([key, value]));
+    if (ex != null) args.addAll(['EX', ex]);
+    if (px != null) args.addAll(['PX', px]);
+    if (exAt != null) args.addAll(['EXAT', exAt]);
+    if (pxAt != null) args.addAll(['PXAT', pxAt]);
+    if (keepTtl == true) args.add('KEEPTTL');
+    if (nx == true) args.add('NX');
+    if (xx == true) args.add('XX');
+
+    final res = await sendCommand(args);
+    return Decoders.toInt(res);
   }
 }

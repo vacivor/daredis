@@ -220,6 +220,10 @@ class RedisClusterTransaction extends RedisTransactionSession
   @override
   Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) async {
     ensureReady();
+    ClusterCommandPolicy.requireKnownSpec(
+      command,
+      context: 'transaction routing',
+    );
     ClusterCommandPolicy.validatePinnedSlot(
       command,
       slot: slot,
@@ -526,6 +530,10 @@ class _DaredisClusterConnection extends RedisClusterClient {
     ClusterNodeAddress? pipelineNode;
 
     for (final item in items) {
+      ClusterCommandPolicy.requireKnownSpec(
+        item.command,
+        context: 'pipeline routing',
+      );
       ClusterCommandPolicy.validateSameSlot(item.command, _slotCache);
       final key = ClusterCommandPolicy.firstKey(item.command);
       if (key == null) {

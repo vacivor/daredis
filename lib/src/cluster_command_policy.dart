@@ -7,6 +7,23 @@ import 'package:daredis/src/exceptions.dart';
 /// This keeps cluster-specific semantics concentrated in the routing layer
 /// instead of spreading them across individual command helpers.
 class ClusterCommandPolicy {
+  /// Returns whether [command] has a registered cluster key specification.
+  static bool hasKnownSpec(List<dynamic> command) {
+    if (command.isEmpty) return false;
+    final cmd = command.first.toString().toUpperCase();
+    return ClusterCommandSpec.specs.containsKey(cmd);
+  }
+
+  /// Ensures [command] uses a registered cluster key specification.
+  static void requireKnownSpec(List<dynamic> command, {required String context}) {
+    if (hasKnownSpec(command)) return;
+    final name = command.isEmpty ? '<empty>' : command.first.toString();
+    throw DaredisUnsupportedException(
+      'Cluster $context requires a known command spec for "$name". '
+      'Use cluster.sendCommand() or add a ClusterCommandSpec entry first.',
+    );
+  }
+
   /// Returns the first extracted key for [command], or `null` when none exist.
   static String? firstKey(List<dynamic> command) {
     final keys = ClusterCommandSpec.extractKeys(command);
