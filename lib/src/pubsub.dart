@@ -136,11 +136,9 @@ class RedisPubSub {
 
   /// Opens the pub/sub socket and replays tracked subscriptions if needed.
   Future<void> connect() async {
+    _ensureOpen();
     if (_socket != null) {
       return;
-    }
-    if (_closed) {
-      _closed = false;
     }
     _shouldReconnect = true;
     try {
@@ -265,13 +263,13 @@ class RedisPubSub {
   void _handlePubSubFrame(List<dynamic> frame) {
     final type = frame[0].toString();
     if (type == 'message') {
-      _pubSubController.add(
+      _addMessage(
         PubSubMessage(type, channel: frame[1].toString(), payload: frame[2]),
       );
       return;
     }
     if (type == 'pmessage') {
-      _pubSubController.add(
+      _addMessage(
         PubSubMessage(
           type,
           pattern: frame[1].toString(),
@@ -286,7 +284,7 @@ class RedisPubSub {
         type == 'unsubscribe' ||
         type == 'punsubscribe') {
       final count = frame.length > 2 ? _parseInt(frame[2]) : null;
-      _pubSubController.add(
+      _addMessage(
         PubSubMessage(
           type,
           channel: frame[1]?.toString(),
@@ -420,10 +418,19 @@ class RedisPubSub {
 
   /// Permanently closes the session and clears tracked subscriptions.
   Future<void> close() async {
+    if (_closed) {
+      if (!_pubSubController.isClosed) {
+        await _pubSubController.close();
+      }
+      return;
+    }
     _closed = true;
     _channels.clear();
     _patterns.clear();
     await disconnect();
+    if (!_pubSubController.isClosed) {
+      await _pubSubController.close();
+    }
   }
 
   Future<void> _handleReconnect() async {
@@ -453,6 +460,13 @@ class RedisPubSub {
   int _parseInt(dynamic value) {
     if (value is int) return value;
     return int.tryParse(value.toString()) ?? 0;
+  }
+
+  void _addMessage(PubSubMessage message) {
+    if (_pubSubController.isClosed) {
+      return;
+    }
+    _pubSubController.add(message);
   }
 
   void _ensureOpen() {

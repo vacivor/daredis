@@ -1,4 +1,5 @@
 import 'package:daredis/daredis.dart';
+import 'package:daredis/src/exceptions.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -62,6 +63,27 @@ void main() {
       expect(message.pattern, 'news.*');
       expect(message.channel, 'news.1');
       expect(message.payload, 'hello');
+    });
+
+    test('close closes the message stream', () async {
+      final pubsub = RedisPubSub(host: '127.0.0.1', port: 6379);
+
+      final done = expectLater(pubsub.messages, emitsDone);
+
+      await pubsub.close();
+
+      await done;
+    });
+
+    test('close permanently closes the session', () async {
+      final pubsub = RedisPubSub(host: '127.0.0.1', port: 6379);
+
+      await pubsub.close();
+
+      await expectLater(
+        pubsub.connect(),
+        throwsA(isA<DaredisStateException>()),
+      );
     });
   });
 }

@@ -144,12 +144,7 @@ class DaredisCluster extends RedisClusterClient
 
   /// Creates a cluster-aware pipeline helper.
   ClusterPipeline pipeline() => ClusterPipeline(
-    (commands) async {
-      for (final command in commands) {
-        _router.validateCommandKeys(command);
-      }
-    },
-    (command, timeout) => sendCommand(command, timeout: timeout),
+    (items) => _router.sendPipeline(items),
   );
 
   @override
@@ -414,6 +409,23 @@ class _DaredisClusterConnection extends RedisClusterClient {
     ClusterCommandPolicy.validateSameSlot(command, _slotCache);
   }
 
+  Future<List<dynamic>> sendPipeline(List<PipelineItem> items) async {
+    ensureReady();
+    if (items.isEmpty) {
+      return const [];
+    }
+
+    final pool = await _pipelinePoolForItems(items);
+    return pool.withResource((connection) async {
+      await connection.ensureConnected();
+      final futures = [
+        for (final item in items)
+          connection.sendCommand(item.command, timeout: item.timeout),
+      ];
+      return Future.wait(futures);
+    });
+  }
+
   Future<RedisClusterTransaction> openTransaction(String routingKey) async {
     final slot = _slotCache.slotForKey(routingKey);
     var node = _slotCache.nodeForSlot(slot);
@@ -505,6 +517,38 @@ class _DaredisClusterConnection extends RedisClusterClient {
     );
   }
 
+  Future<Pool<Connection>> _pipelinePoolForItems(List<PipelineItem> items) async {
+    ClusterNodeAddress? pipelineNode;
+
+    for (final item in items) {
+      ClusterCommandPolicy.validateSameSlot(item.command, _slotCache);
+      final key = ClusterCommandPolicy.firstKey(item.command);
+      if (key == null) {
+        continue;
+      }
+
+      var node = _slotCache.nodeForKey(key);
+      if (node == null) {
+        await _refreshSlots();
+        node = _slotCache.nodeForKey(key);
+      }
+      if (node == null) {
+        throw DaredisClusterException(
+          'Unable to resolve a cluster node for pipeline command ${item.command.first}',
+        );
+      }
+      if (pipelineNode != null && pipelineNode != node) {
+        throw DaredisClusterException(
+          'Cluster pipeline commands must route to the same node. '
+          'Use hash tags or separate pipelines.',
+        );
+      }
+      pipelineNode = node;
+    }
+
+    return pipelineNode == null ? _anyPool() : _poolForAddress(pipelineNode);
+  }
+
   Pool<Connection> _createNodePool(ConnectionOptions options) {
     return Pool<Connection>(
       config: _nodePoolConfig,
@@ -557,13 +601,11 @@ class _DaredisClusterConnection extends RedisClusterClient {
 }
 
 class ClusterPipeline {
-  final Future<void> Function(List<List<dynamic>> commands) _validator;
-  final Future<dynamic> Function(List<dynamic> command, Duration? timeout)
-  _sender;
+  final Future<List<dynamic>> Function(List<PipelineItem> items) _sender;
   final List<PipelineItem> _items = [];
   bool _executed = false;
 
-  ClusterPipeline(this._validator, this._sender);
+  ClusterPipeline(this._sender);
 
   void add(List<dynamic> command, {Duration? timeout}) {
     if (_executed) {
@@ -577,10 +619,7 @@ class ClusterPipeline {
       throw DaredisStateException('Pipeline already executed');
     }
     _executed = true;
-    final commands = _items.map((item) => item.command).toList();
-    await _validator(commands);
-    final futures = _items.map((item) => _sender(item.command, item.timeout));
-    final batch = Future.wait(futures);
+    final batch = _sender(List<PipelineItem>.unmodifiable(_items));
     if (timeout == null) {
       return await batch;
     }
