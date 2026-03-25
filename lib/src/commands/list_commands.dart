@@ -1,5 +1,12 @@
 part of '../../daredis.dart';
 
+class ListPopResult {
+  final String key;
+  final List<String> values;
+
+  ListPopResult(this.key, this.values);
+}
+
 mixin RedisListCommands on RedisCommandExecutor {
   /// Pushes one or more [values] onto the head of the list at [key].
   Future<int> lPush(String key, dynamic values) async {
@@ -11,10 +18,30 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  /// Pushes one or more [values] onto the head of the list at [key] only when it exists.
+  Future<int> lPushX(String key, dynamic values) async {
+    final res = await sendCommand([
+      'LPUSHX',
+      key,
+      if (values is List) ...values else values,
+    ]);
+    return Decoders.toInt(res);
+  }
+
   /// Pushes one or more [values] onto the tail of the list at [key].
   Future<int> rPush(String key, dynamic values) async {
     final res = await sendCommand([
       'RPUSH',
+      key,
+      if (values is List) ...values else values,
+    ]);
+    return Decoders.toInt(res);
+  }
+
+  /// Pushes one or more [values] onto the tail of the list at [key] only when it exists.
+  Future<int> rPushX(String key, dynamic values) async {
+    final res = await sendCommand([
+      'RPUSHX',
       key,
       if (values is List) ...values else values,
     ]);
@@ -66,6 +93,29 @@ mixin RedisListCommands on RedisCommandExecutor {
   Future<String?> lIndex(String key, int index) async {
     final res = await sendCommand(['LINDEX', key, index]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Returns matching positions of [element] in the list at [key].
+  Future<List<int>> lPos(
+    String key,
+    String element, {
+    int? rank,
+    int? count,
+    int? maxLen,
+  }) async {
+    final args = <dynamic>['LPOS', key, element];
+    if (rank != null) args.addAll(['RANK', rank]);
+    if (count != null) args.addAll(['COUNT', count]);
+    if (maxLen != null) args.addAll(['MAXLEN', maxLen]);
+
+    final res = await sendCommand(args);
+    if (res is List) {
+      return res.map((value) => Decoders.toInt(value)).toList();
+    }
+    if (res != null) {
+      return [Decoders.toInt(res)];
+    }
+    return const [];
   }
 
   /// Replaces the list element at [index] with [value].
@@ -122,6 +172,21 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Blocking variant of [rPopLPush].
+  Future<String?> bRPopLPush(
+    String source,
+    String destination,
+    int timeout,
+  ) async {
+    final res = await sendCommand([
+      'BRPOPLPUSH',
+      source,
+      destination,
+      timeout,
+    ]);
+    return Decoders.toStringOrNull(res);
+  }
+
   /// Moves one element from [source] to [destination].
   Future<String?> lMove(
     String source,
@@ -156,5 +221,41 @@ mixin RedisListCommands on RedisCommandExecutor {
       timeout,
     ]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Pops one or more elements from the first non-empty list in [keys].
+  Future<ListPopResult?> lMPop(
+    List<String> keys,
+    String where, {
+    int? count,
+  }) async {
+    final args = <dynamic>['LMPOP', keys.length, ...keys, where];
+    if (count != null) args.addAll(['COUNT', count]);
+    final res = await sendCommand(args);
+    return _parseListPopResult(res);
+  }
+
+  /// Blocking variant of [lMPop].
+  Future<ListPopResult?> bLMPop(
+    int timeout,
+    List<String> keys,
+    String where, {
+    int? count,
+  }) async {
+    final args = <dynamic>['BLMPOP', timeout, keys.length, ...keys, where];
+    if (count != null) args.addAll(['COUNT', count]);
+    final res = await sendCommand(args);
+    return _parseListPopResult(res);
+  }
+
+  ListPopResult? _parseListPopResult(dynamic res) {
+    if (res == null) return null;
+    if (res is List && res.length == 2 && res[1] is List) {
+      return ListPopResult(
+        res[0].toString(),
+        (res[1] as List).map((value) => value.toString()).toList(),
+      );
+    }
+    throw DaredisProtocolException('Unexpected list pop response: $res');
   }
 }

@@ -380,6 +380,19 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     return sendCommand(['XINFO', ...args]);
   }
 
+  Future<String> xSetId(
+    String key,
+    String lastId, {
+    int? entriesAdded,
+    String? maxDeletedId,
+  }) async {
+    final args = <dynamic>['XSETID', key, lastId];
+    if (entriesAdded != null) args.addAll(['ENTRIESADDED', entriesAdded]);
+    if (maxDeletedId != null) args.addAll(['MAXDELETEDID', maxDeletedId]);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
   Future<dynamic> xInfoStream(String key, {bool full = false, int? count}) {
     final args = <dynamic>['STREAM', key];
     if (full) {

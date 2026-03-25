@@ -49,6 +49,11 @@ ClusterNodeAddress _clusterNodeAddressFromReply(dynamic reply) {
 }
 
 mixin RedisClusterCommands on RedisClusterClient {
+  Future<String> asking() async {
+    final res = await sendCommand(['ASKING']);
+    return Decoders.string(res);
+  }
+
   Future<dynamic> clusterSlots() => sendCommand(['CLUSTER', 'SLOTS']);
 
   Future<List<ClusterSlotRange>> clusterSlotRanges() async {
@@ -127,6 +132,29 @@ mixin RedisClusterCommands on RedisClusterClient {
 
   Future<String> readWrite() async {
     final res = await sendCommand(['READWRITE']);
+    return Decoders.string(res);
+  }
+
+  Future<String> restoreAsking(
+    String key,
+    int ttlMilliseconds,
+    dynamic serializedValue, {
+    bool replace = false,
+    bool absTtl = false,
+    int? idleTimeSeconds,
+    int? frequency,
+  }) async {
+    final args = <dynamic>[
+      'RESTORE-ASKING',
+      key,
+      ttlMilliseconds,
+      serializedValue,
+    ];
+    if (replace) args.add('REPLACE');
+    if (absTtl) args.add('ABSTTL');
+    if (idleTimeSeconds != null) args.addAll(['IDLETIME', idleTimeSeconds]);
+    if (frequency != null) args.addAll(['FREQ', frequency]);
+    final res = await sendCommand(args);
     return Decoders.string(res);
   }
 }

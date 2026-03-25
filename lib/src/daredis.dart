@@ -14,7 +14,7 @@ class Daredis extends RedisClient
         RedisScriptingCommands,
         RedisGeoCommands,
         RedisHyperLogLogCommands
-    implements RedisPubSubCapable, RedisTransactionCapable {
+    implements RedisPubSubCapable, RedisTransactionCapable, RedisMonitorCapable {
   final ConnectionOptions options;
   final Pool<Connection> _pool;
   bool _connected = false;
@@ -142,5 +142,17 @@ class Daredis extends RedisClient
     );
     await transaction.connect();
     return transaction;
+  }
+
+  @override
+  /// Opens a dedicated MONITOR session.
+  Future<RedisMonitor> openMonitor({ReconnectPolicy? reconnectPolicy}) async {
+    final monitor = RedisMonitor.fromOptions(
+      options.copyWith(
+        reconnectPolicy: reconnectPolicy ?? options.reconnectPolicy,
+      ),
+    );
+    await monitor.connect();
+    return monitor;
   }
 }

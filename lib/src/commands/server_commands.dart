@@ -358,6 +358,30 @@ class RedisRoleInfo {
   }
 }
 
+class RedisLatencySample {
+  final int timestamp;
+  final int latencyMilliseconds;
+
+  RedisLatencySample({
+    required this.timestamp,
+    required this.latencyMilliseconds,
+  });
+}
+
+class RedisLatencyLatestEvent {
+  final String event;
+  final int timestamp;
+  final int latestLatencyMilliseconds;
+  final int maxLatencyMilliseconds;
+
+  RedisLatencyLatestEvent({
+    required this.event,
+    required this.timestamp,
+    required this.latestLatencyMilliseconds,
+    required this.maxLatencyMilliseconds,
+  });
+}
+
 class RedisRoleReplica {
   final String host;
   final int port;
@@ -418,16 +442,10 @@ Map<String, dynamic> _serverReplyAsMap(dynamic value) {
 }
 
 List<Map<String, dynamic>> _serverReplyAsMapList(dynamic value) {
-  final normalized = _normalizeServerReply(value);
-  if (normalized is List) {
-    return normalized.map((item) {
-      if (item is Map<String, dynamic>) {
-        return item;
-      }
-      throw DaredisProtocolException(
-        'Unexpected list item type: ${item.runtimeType}',
-      );
-    }).toList();
+  if (value is List) {
+    return value
+        .map((item) => _serverReplyAsMap(item))
+        .toList(growable: false);
   }
   throw DaredisProtocolException(
     'Unexpected response type: ${value.runtimeType}',
@@ -435,6 +453,35 @@ List<Map<String, dynamic>> _serverReplyAsMapList(dynamic value) {
 }
 
 mixin RedisServerCommands on RedisCommandExecutor {
+  Future<String> auth(String password, {String? username}) async {
+    final args = <dynamic>['AUTH'];
+    if (username != null) args.add(username);
+    args.add(password);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> hello({
+    int protocolVersion = 3,
+    String? username,
+    String? password,
+    String? clientName,
+  }) async {
+    if ((username == null) != (password == null)) {
+      throw ArgumentError('HELLO AUTH requires both username and password');
+    }
+
+    final args = <dynamic>['HELLO', protocolVersion];
+    if (username != null && password != null) {
+      args.addAll(['AUTH', username, password]);
+    }
+    if (clientName != null) {
+      args.addAll(['SETNAME', clientName]);
+    }
+    final res = await sendCommand(args);
+    return _serverReplyAsMap(res);
+  }
+
   Future<String> ping([String? message]) async {
     final args = ['PING'];
     if (message != null) args.add(message);
@@ -607,6 +654,10 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return Decoders.string(res);
   }
 
+  Future<String> slaveOf(String? host, int? port) {
+    return replicaOf(host, port);
+  }
+
   Future<String> flushDb({bool? async}) async {
     final res = await sendCommand(['FLUSHDB', if (async == true) 'ASYNC']);
     return Decoders.string(res);
@@ -711,6 +762,96 @@ mixin RedisServerCommands on RedisCommandExecutor {
   Future<Map<String, dynamic>> memoryStats() async {
     final res = await sendCommand(['MEMORY', 'STATS']);
     return _serverReplyAsMap(res);
+  }
+
+  Future<String> latencyDoctor() async {
+    final res = await sendCommand(['LATENCY', 'DOCTOR']);
+    return Decoders.string(res);
+  }
+
+  Future<String> latencyGraph(String event) async {
+    final res = await sendCommand(['LATENCY', 'GRAPH', event]);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> latencyHistogram([List<String>? commands]) async {
+    final res = await sendCommand([
+      'LATENCY',
+      'HISTOGRAM',
+      if (commands != null) ...commands,
+    ]);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<List<RedisLatencySample>> latencyHistory(String event) async {
+    final res = await sendCommand(['LATENCY', 'HISTORY', event]);
+    if (res is! List) return const [];
+    return res.whereType<List>().map((entry) {
+      return RedisLatencySample(
+        timestamp: int.parse(entry[0].toString()),
+        latencyMilliseconds: int.parse(entry[1].toString()),
+      );
+    }).toList(growable: false);
+  }
+
+  Future<List<RedisLatencyLatestEvent>> latencyLatest() async {
+    final res = await sendCommand(['LATENCY', 'LATEST']);
+    if (res is! List) return const [];
+    return res.whereType<List>().map((entry) {
+      return RedisLatencyLatestEvent(
+        event: entry[0].toString(),
+        timestamp: int.parse(entry[1].toString()),
+        latestLatencyMilliseconds: int.parse(entry[2].toString()),
+        maxLatencyMilliseconds: int.parse(entry[3].toString()),
+      );
+    }).toList(growable: false);
+  }
+
+  Future<int> latencyReset([List<String>? events]) async {
+    final res = await sendCommand([
+      'LATENCY',
+      'RESET',
+      if (events != null) ...events,
+    ]);
+    return Decoders.toInt(res);
+  }
+
+  Future<List<Map<String, dynamic>>> moduleList() async {
+    final res = await sendCommand(['MODULE', 'LIST']);
+    return _serverReplyAsMapList(res);
+  }
+
+  Future<String> moduleLoad(String path, [List<String>? args]) async {
+    final res = await sendCommand([
+      'MODULE',
+      'LOAD',
+      path,
+      if (args != null) ...args,
+    ]);
+    return Decoders.string(res);
+  }
+
+  Future<String> moduleLoadEx(
+    String path, {
+    Map<String, String>? configs,
+    List<String>? args,
+  }) async {
+    final command = <dynamic>['MODULE', 'LOADEX', path];
+    if (configs != null) {
+      configs.forEach((name, value) {
+        command.addAll(['CONFIG', name, value]);
+      });
+    }
+    if (args != null && args.isNotEmpty) {
+      command.addAll(['ARGS', ...args]);
+    }
+    final res = await sendCommand(command);
+    return Decoders.string(res);
+  }
+
+  Future<String> moduleUnload(String name) async {
+    final res = await sendCommand(['MODULE', 'UNLOAD', name]);
+    return Decoders.string(res);
   }
 
   Future<List<String>> pubSubChannels([String? pattern]) async {

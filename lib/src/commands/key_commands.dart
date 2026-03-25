@@ -1,6 +1,35 @@
 part of '../../daredis.dart';
 
 mixin RedisKeyCommands on RedisCommandExecutor {
+  List<dynamic> _sortArgs(
+    String command,
+    String key, {
+    String? byPattern,
+    int? offset,
+    int? count,
+    List<String>? getPatterns,
+    bool descending = false,
+    bool alpha = false,
+    String? storeDestination,
+  }) {
+    if ((offset == null) != (count == null)) {
+      throw ArgumentError('SORT LIMIT requires both offset and count');
+    }
+
+    final args = <dynamic>[command, key];
+    if (byPattern != null) args.addAll(['BY', byPattern]);
+    if (offset != null && count != null) args.addAll(['LIMIT', offset, count]);
+    if (getPatterns != null) {
+      for (final pattern in getPatterns) {
+        args.addAll(['GET', pattern]);
+      }
+    }
+    args.add(descending ? 'DESC' : 'ASC');
+    if (alpha) args.add('ALPHA');
+    if (storeDestination != null) args.addAll(['STORE', storeDestination]);
+    return args;
+  }
+
   /// Returns how many of [keys] currently exist.
   Future<int> exists(dynamic keys) async {
     final res = await sendCommand([
@@ -131,6 +160,156 @@ mixin RedisKeyCommands on RedisCommandExecutor {
     final res = await sendCommand(['KEYS', pattern]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
+  }
+
+  /// Returns the serialized value stored at [key], or `null` when missing.
+  Future<String?> dump(String key) async {
+    final res = await sendCommand(['DUMP', key]);
+    return Decoders.toStringOrNull(res);
+  }
+
+  /// Restores a value created by [dump] into [key].
+  Future<String> restore(
+    String key,
+    int ttlMilliseconds,
+    dynamic serializedValue, {
+    bool replace = false,
+    bool absTtl = false,
+    int? idleTimeSeconds,
+    int? frequency,
+  }) async {
+    final args = <dynamic>['RESTORE', key, ttlMilliseconds, serializedValue];
+    if (replace) args.add('REPLACE');
+    if (absTtl) args.add('ABSTTL');
+    if (idleTimeSeconds != null) args.addAll(['IDLETIME', idleTimeSeconds]);
+    if (frequency != null) args.addAll(['FREQ', frequency]);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  /// Sorts the elements stored at [key] and returns the resulting values.
+  Future<List<String?>> sort(
+    String key, {
+    String? byPattern,
+    int? offset,
+    int? count,
+    List<String>? getPatterns,
+    bool descending = false,
+    bool alpha = false,
+  }) async {
+    final res = await sendCommand(
+      _sortArgs(
+        'SORT',
+        key,
+        byPattern: byPattern,
+        offset: offset,
+        count: count,
+        getPatterns: getPatterns,
+        descending: descending,
+        alpha: alpha,
+      ),
+    );
+    if (res is! List) return const [];
+    return res.map(Decoders.toStringOrNull).toList(growable: false);
+  }
+
+  /// Sorts the elements stored at [key] and stores the result into [destination].
+  Future<int> sortStore(
+    String key,
+    String destination, {
+    String? byPattern,
+    int? offset,
+    int? count,
+    List<String>? getPatterns,
+    bool descending = false,
+    bool alpha = false,
+  }) async {
+    final res = await sendCommand(
+      _sortArgs(
+        'SORT',
+        key,
+        byPattern: byPattern,
+        offset: offset,
+        count: count,
+        getPatterns: getPatterns,
+        descending: descending,
+        alpha: alpha,
+        storeDestination: destination,
+      ),
+    );
+    return Decoders.toInt(res);
+  }
+
+  /// Read-only variant of [sort].
+  Future<List<String?>> sortRo(
+    String key, {
+    String? byPattern,
+    int? offset,
+    int? count,
+    List<String>? getPatterns,
+    bool descending = false,
+    bool alpha = false,
+  }) async {
+    final res = await sendCommand(
+      _sortArgs(
+        'SORT_RO',
+        key,
+        byPattern: byPattern,
+        offset: offset,
+        count: count,
+        getPatterns: getPatterns,
+        descending: descending,
+        alpha: alpha,
+      ),
+    );
+    if (res is! List) return const [];
+    return res.map(Decoders.toStringOrNull).toList(growable: false);
+  }
+
+  /// Atomically migrates one key or a batch of [keys] to another Redis instance.
+  Future<String> migrate(
+    String host,
+    int port, {
+    String? key,
+    List<String>? keys,
+    required int destinationDb,
+    required int timeoutMilliseconds,
+    bool copy = false,
+    bool replace = false,
+    String? authPassword,
+    String? authUsername,
+  }) async {
+    final hasSingleKey = key != null;
+    final hasMultipleKeys = keys != null && keys.isNotEmpty;
+
+    if (hasSingleKey == hasMultipleKeys) {
+      throw ArgumentError('Provide exactly one of key or keys');
+    }
+    if (authUsername != null && authPassword == null) {
+      throw ArgumentError('AUTH2 requires both username and password');
+    }
+
+    final args = <dynamic>[
+      'MIGRATE',
+      host,
+      port,
+      if (hasSingleKey) key else '',
+      destinationDb,
+      timeoutMilliseconds,
+    ];
+    if (copy) args.add('COPY');
+    if (replace) args.add('REPLACE');
+    if (authUsername != null) {
+      args.addAll(['AUTH2', authUsername, authPassword!]);
+    } else if (authPassword != null) {
+      args.addAll(['AUTH', authPassword]);
+    }
+    if (hasMultipleKeys) {
+      args.addAll(['KEYS', ...keys]);
+    }
+
+    final res = await sendCommand(args);
+    return Decoders.string(res);
   }
 
   /// Returns a random key from the current database, or `null` when empty.

@@ -93,7 +93,7 @@ class DaredisCluster extends RedisClusterClient
         RedisGeoCommands,
         RedisHyperLogLogCommands,
         RedisClusterCommands
-    implements RedisPubSubCapable {
+    implements RedisPubSubCapable, RedisMonitorCapable {
   final ClusterOptions options;
   final _DaredisClusterConnection _router;
   bool _connected = false;
@@ -163,6 +163,24 @@ class DaredisCluster extends RedisClusterClient
     final pubsub = RedisPubSub.fromOptions(opts);
     await pubsub.connect();
     return pubsub;
+  }
+
+  @override
+  /// Opens a dedicated MONITOR session against a chosen cluster node.
+  Future<RedisMonitor> openMonitor({ClusterNode? node}) async {
+    if (options.seeds.isEmpty) {
+      throw DaredisStateException('Cluster seeds cannot be empty');
+    }
+    final target = node ?? options.seeds.first;
+    final opts = options.connectionOptions.copyWith(
+      host: target.host,
+      port: target.port,
+      reconnectPolicy:
+          options.reconnectPolicy ?? options.connectionOptions.reconnectPolicy,
+    );
+    final monitor = RedisMonitor.fromOptions(opts);
+    await monitor.connect();
+    return monitor;
   }
 
   /// Opens a transaction pinned to the slot derived from [routingKey].

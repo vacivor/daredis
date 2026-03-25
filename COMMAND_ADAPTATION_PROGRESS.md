@@ -13,10 +13,10 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 244
+- Ready: 284
 - Partial: 22
 - Helper only: 14
-- Raw + routed: 40
+- Raw + routed: 0
 - Raw only: 125
 
 ## String commands
@@ -85,19 +85,19 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `BLMOVE` | Yes | Yes | Ready | Pops an element from a list, pushes it to another list and returns it. Blocks until an element is available otherwise. Deletes the list if the last element was moved. |
-| `BLMPOP` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `BLMPOP` | Yes | Yes | Ready | Pops the first element from one of multiple lists. Blocks until an element is available otherwise. Deletes the list if the last element was popped. |
 | `BLPOP` | Yes | Yes | Ready | Removes and returns the first element in a list. Blocks until an element is available otherwise. Deletes the list if the last element was popped. |
 | `BRPOP` | Yes | Yes | Ready | Removes and returns the last element in a list. Blocks until an element is available otherwise. Deletes the list if the last element was popped. |
-| `BRPOPLPUSH` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `BRPOPLPUSH` | Yes | Yes | Ready | Pops an element from a list, pushes it to another list and returns it. Block until an element is available otherwise. Deletes the list if the last element was popped. |
 | `LINDEX` | Yes | Yes | Ready | Returns an element from a list by its index. |
 | `LINSERT` | Yes | Yes | Ready | Inserts an element before or after another element in a list. |
 | `LLEN` | Yes | Yes | Ready | Returns the length of a list. |
 | `LMOVE` | Yes | Yes | Ready | Returns an element after popping it from one list and pushing it to another. Deletes the list if the last element was moved. |
-| `LMPOP` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `LMPOP` | Yes | Yes | Ready | Returns multiple elements from a list after removing them. Deletes the list if the last element was popped. |
 | `LPOP` | Yes | Yes | Ready | Returns the first elements in a list after removing it. Deletes the list if the last element was popped. |
-| `LPOS` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `LPOS` | Yes | Yes | Ready | Returns the index of matching elements in a list. |
 | `LPUSH` | Yes | Yes | Ready | Prepends one or more elements to a list. Creates the key if it doesn't exist. |
-| `LPUSHX` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `LPUSHX` | Yes | Yes | Ready | Prepends one or more elements to a list only when the list exists. |
 | `LRANGE` | Yes | Yes | Ready | Returns a range of elements from a list. |
 | `LREM` | Yes | Yes | Ready | Removes elements from a list. Deletes the list if the last element was removed. |
 | `LSET` | Yes | Yes | Ready | Sets the value of an element in a list by its index. |
@@ -105,7 +105,7 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `RPOP` | Yes | Yes | Ready | Returns and removes the last elements of a list. Deletes the list if the last element was popped. |
 | `RPOPLPUSH` | Yes | Yes | Ready | Returns the last element of a list after removing and pushing it to another list. Deletes the list if the last element was popped. |
 | `RPUSH` | Yes | Yes | Ready | Appends one or more elements to a list. Creates the key if it doesn't exist. |
-| `RPUSHX` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `RPUSHX` | Yes | Yes | Ready | Appends one or more elements to a list only when the list exists. |
 ## Set commands
 
 | Command | Helper | Cluster | Status | Notes |
@@ -131,9 +131,9 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `BZMPOP` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
-| `BZPOPMAX` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
-| `BZPOPMIN` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `BZMPOP` | Yes | Yes | Ready | Pops the highest or lowest scoring members from one of multiple sorted sets. Blocks until a member is available otherwise. |
+| `BZPOPMAX` | Yes | Yes | Ready | Removes and returns the member with the highest score from one of multiple sorted sets. Blocks until a member is available otherwise. |
+| `BZPOPMIN` | Yes | Yes | Ready | Removes and returns the member with the lowest score from one of multiple sorted sets. Blocks until a member is available otherwise. |
 | `ZADD` | Yes | Yes | Ready | Adds one or more members to a sorted set, or updates their scores. Creates the key if it doesn't exist. |
 | `ZCARD` | Yes | Yes | Ready | Returns the number of members in a sorted set. |
 | `ZCOUNT` | Yes | Yes | Ready | Returns the count of members in a sorted set that have scores within a range. |
@@ -141,26 +141,26 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `ZDIFFSTORE` | Yes | Yes | Ready | Stores the difference of multiple sorted sets in a key. |
 | `ZINCRBY` | Yes | Yes | Ready | Increments the score of a member in a sorted set. |
 | `ZINTER` | Yes | Yes | Ready | Returns the intersect of multiple sorted sets. |
-| `ZINTERCARD` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `ZINTERCARD` | Yes | Yes | Ready | Returns the number of members of the intersect of multiple sorted sets. |
 | `ZINTERSTORE` | Yes | Yes | Ready | Stores the intersect of multiple sorted sets in a key. |
 | `ZLEXCOUNT` | Yes | Yes | Ready | Returns the number of members in a sorted set within a lexicographical range. |
-| `ZMPOP` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
-| `ZMSCORE` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `ZMPOP` | Yes | Yes | Ready | Pops the highest or lowest scoring members from one of multiple sorted sets. |
+| `ZMSCORE` | Yes | Yes | Ready | Returns the scores associated with the given members in a sorted set. |
 | `ZPOPMAX` | Yes | Yes | Ready | Returns the highest-scoring members from a sorted set after removing them. Deletes the sorted set if the last member was popped. |
 | `ZPOPMIN` | Yes | Yes | Ready | Returns the lowest-scoring members from a sorted set after removing them. Deletes the sorted set if the last member was popped. |
-| `ZRANDMEMBER` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `ZRANDMEMBER` | Yes | Yes | Ready | Returns one or more random members from a sorted set. |
 | `ZRANGE` | Yes | Yes | Ready | Returns members in a sorted set within a range of indexes. |
 | `ZRANGEBYLEX` | Yes | Yes | Ready | Returns members in a sorted set within a lexicographical range. |
 | `ZRANGEBYSCORE` | Yes | Yes | Ready | Returns members in a sorted set within a range of scores. |
-| `ZRANGESTORE` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `ZRANGESTORE` | Yes | Yes | Ready | Stores a range of members from a sorted set in another key. |
 | `ZRANK` | Yes | Yes | Ready | Returns the index of a member in a sorted set ordered by ascending scores. |
 | `ZREM` | Yes | Yes | Ready | Removes one or more members from a sorted set. Deletes the sorted set if all members were removed. |
 | `ZREMRANGEBYLEX` | Yes | Yes | Ready | Removes members in a sorted set within a lexicographical range. Deletes the sorted set if all members were removed. |
 | `ZREMRANGEBYRANK` | Yes | Yes | Ready | Removes members in a sorted set within a range of indexes. Deletes the sorted set if all members were removed. |
 | `ZREMRANGEBYSCORE` | Yes | Yes | Ready | Removes members in a sorted set within a range of scores. Deletes the sorted set if all members were removed. |
 | `ZREVRANGE` | Yes | Yes | Ready | Returns members in a sorted set within a range of indexes in reverse order. |
-| `ZREVRANGEBYLEX` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
-| `ZREVRANGEBYSCORE` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `ZREVRANGEBYLEX` | Yes | Yes | Ready | Returns members in a sorted set within a lexicographical range in reverse order. |
+| `ZREVRANGEBYSCORE` | Yes | Yes | Ready | Returns members in a sorted set within a range of scores in reverse order. |
 | `ZREVRANK` | Yes | Yes | Ready | Returns the index of a member in a sorted set ordered by descending scores. |
 | `ZSCAN` | Yes | Yes | Ready | Iterates over members and scores of a sorted set. |
 | `ZSCORE` | Yes | Yes | Ready | Returns the score of a member in a sorted set. |
@@ -192,7 +192,7 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `XREAD` | Yes | Yes | Ready | Returns messages from multiple streams with IDs greater than the ones requested. Blocks until a message is available otherwise. |
 | `XREADGROUP` | Yes | Yes | Ready | Returns new or historical messages from a stream for a consumer in a group. Blocks until a message is available otherwise. |
 | `XREVRANGE` | Yes | Yes | Ready | Returns the messages from a stream within a range of IDs in reverse order. |
-| `XSETID` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `XSETID` | Yes | Yes | Ready | An internal command for replicating stream values. |
 | `XTRIM` | Yes | Yes | Ready | Deletes messages from the beginning of a stream. |
 ## Bitmap commands
 
@@ -358,8 +358,8 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `EVALSHA` | Yes | Yes | Ready | Executes a server-side Lua script by SHA1 digest. |
 | `EVALSHA_RO` | Yes | Yes | Ready | Executes a read-only server-side Lua script by SHA1 digest. |
 | `EVAL_RO` | Yes | Yes | Ready | Executes a read-only server-side Lua script. |
-| `FCALL` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
-| `FCALL_RO` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `FCALL` | Yes | Yes | Ready | Calls a function. |
+| `FCALL_RO` | Yes | Yes | Ready | Calls a read-only function. |
 | `FUNCTION DELETE` | Yes | Yes | Ready | Deletes a library and its functions. |
 | `FUNCTION DUMP` | Yes | Yes | Ready | Dumps all libraries into a serialized binary payload. |
 | `FUNCTION FLUSH` | Yes | Yes | Ready | Deletes all libraries and functions. |
@@ -377,7 +377,7 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `AUTH` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `AUTH` | Yes | Yes | Ready | Authenticates the connection. |
 | `CLIENT CACHING` | Yes | Yes | Ready | Instructs the server whether to track the keys in the next request. |
 | `CLIENT GETNAME` | Yes | Yes | Ready | Returns the name of the connection. |
 | `CLIENT GETREDIR` | Yes | Yes | Ready | Returns the client ID to which the connection's tracking notifications are redirected. |
@@ -396,7 +396,7 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `CLIENT UNBLOCK` | Yes | Yes | Ready | Unblocks a client blocked by a blocking command from a different connection. |
 | `CLIENT UNPAUSE` | Yes | Yes | Ready | Resumes processing commands from paused clients. |
 | `ECHO` | Yes | Yes | Ready | Returns the given string. |
-| `HELLO` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `HELLO` | Yes | Yes | Ready | Handshakes with the Redis server. |
 | `PING` | Yes | Yes | Ready | Returns the server's liveliness response. |
 | `QUIT` | No | No | Raw only | Raw only |
 | `RESET` | No | No | Raw only | Raw only |
@@ -441,31 +441,31 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `HOTKEYS STOP` | No | No | Raw only | Raw only |
 | `INFO` | Yes | Yes | Ready | Returns information and statistics about the server. |
 | `LASTSAVE` | No | No | Raw only | Raw only |
-| `LATENCY DOCTOR` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `LATENCY GRAPH` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `LATENCY HISTOGRAM` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `LATENCY HISTORY` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `LATENCY LATEST` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `LATENCY RESET` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
+| `LATENCY DOCTOR` | Yes | Family | Ready | Returns a human-readable latency analysis report. |
+| `LATENCY GRAPH` | Yes | Family | Ready | Returns an ASCII latency graph for an event. |
+| `LATENCY HISTOGRAM` | Yes | Family | Ready | Returns per-command latency histograms as normalized maps. |
+| `LATENCY HISTORY` | Yes | Family | Ready | Returns timestamp-latency samples for an event. |
+| `LATENCY LATEST` | Yes | Family | Ready | Returns the latest latency samples for all events. |
+| `LATENCY RESET` | Yes | Family | Ready | Resets latency samples for one or more events. |
 | `LOLWUT` | No | No | Raw only | Raw only |
 | `MEMORY DOCTOR` | Yes | Yes | Ready | Outputs a memory problems report. |
 | `MEMORY MALLOC-STATS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
 | `MEMORY PURGE` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
 | `MEMORY STATS` | Yes | Yes | Ready | Returns details about memory usage. |
 | `MEMORY USAGE` | Yes | Yes | Ready | Estimates the memory usage of a key. |
-| `MODULE LIST` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `MODULE LOAD` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `MODULE LOADEX` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `MODULE UNLOAD` | No | Family | Raw + routed | Raw sendCommand only; cluster family parser exists |
-| `MONITOR` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `MODULE LIST` | Yes | Family | Ready | Returns the loaded modules as normalized maps. |
+| `MODULE LOAD` | Yes | Family | Ready | Loads a module from a shared library path. |
+| `MODULE LOADEX` | Yes | Family | Ready | Loads a module with CONFIG and ARGS sections. |
+| `MODULE UNLOAD` | Yes | Family | Ready | Unloads a module by name. |
+| `MONITOR` | Yes | Yes | Ready | Dedicated monitor session with a streaming message API. |
 | `PSYNC` | No | No | Raw only | Raw only |
 | `REPLCONF` | No | No | Raw only | Raw only |
 | `REPLICAOF` | Yes | Yes | Ready | Configures a server as replica of another, or promotes it to a master. |
-| `RESTORE-ASKING` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `RESTORE-ASKING` | Yes | Yes | Ready | Restores a serialized key on an importing cluster node. |
 | `ROLE` | Yes | Yes | Ready | Returns the replication role. |
 | `SAVE` | No | No | Raw only | Raw only |
 | `SHUTDOWN` | No | No | Raw only | Raw only |
-| `SLAVEOF` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `SLAVEOF` | Yes | Yes | Ready | Deprecated alias of REPLICAOF. |
 | `SLOWLOG GET` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
 | `SLOWLOG LEN` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
 | `SLOWLOG RESET` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
@@ -476,7 +476,7 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `ASKING` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `ASKING` | Yes | Yes | Ready | Enables an importing cluster node to accept the next command. |
 | `CLUSTER ADDSLOTS` | Yes | Yes | Ready | Assigns new hash slots to a node. |
 | `CLUSTER ADDSLOTSRANGE` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
 | `CLUSTER BUMPEPOCH` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
@@ -514,13 +514,13 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | --- | --- | --- | --- | --- |
 | `COPY` | Yes | Yes | Ready | Copies the value of a key to a new key. |
 | `DEL` | Yes | Yes | Ready | Deletes one or more keys. |
-| `DUMP` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `DUMP` | Yes | Yes | Ready | Returns a serialized representation of the value stored at a key. |
 | `EXISTS` | Yes | Yes | Ready | Determines whether one or more keys exist. |
 | `EXPIRE` | Yes | Yes | Ready | Sets the expiration time of a key in seconds. |
 | `EXPIREAT` | Yes | Yes | Ready | Sets the expiration time of a key to a Unix timestamp. |
 | `EXPIRETIME` | Yes | Yes | Ready | Returns the expiration time of a key as a Unix timestamp. |
 | `KEYS` | Yes | No | Helper only | Typed helper without dedicated cluster spec |
-| `MIGRATE` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `MIGRATE` | Yes | Yes | Ready | Atomically transfers one or more keys to another Redis instance. |
 | `MOVE` | Yes | Yes | Ready | Moves a key to another database. |
 | `OBJECT ENCODING` | Yes | Yes | Ready | Returns the internal encoding of a Redis object. |
 | `OBJECT FREQ` | Yes | Yes | Ready | Returns the logarithmic access frequency counter of a Redis object. |
@@ -534,10 +534,10 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `RANDOMKEY` | Yes | No | Helper only | Typed helper without dedicated cluster spec |
 | `RENAME` | Yes | Yes | Ready | Renames a key and overwrites the destination. |
 | `RENAMENX` | Yes | Yes | Ready | Renames a key only when the target key name doesn't exist. |
-| `RESTORE` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `RESTORE` | Yes | Yes | Ready | Creates a key from the serialized representation of a value. |
 | `SCAN` | Yes | No | Helper only | Typed helper without dedicated cluster spec |
-| `SORT` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
-| `SORT_RO` | No | Yes | Raw + routed | Raw sendCommand only, but cluster-aware |
+| `SORT` | Yes | Yes | Ready | Sorts the elements in a list, set, or sorted set, optionally storing the result. |
+| `SORT_RO` | Yes | Yes | Ready | Returns the sorted elements of a list, set, or sorted set. |
 | `TOUCH` | Yes | Yes | Ready | Returns the number of existing keys out of those specified after updating the time they were last accessed. |
 | `TTL` | Yes | Yes | Ready | Returns the expiration time in seconds of a key. |
 | `TYPE` | Yes | Yes | Ready | Determines the type of value stored at a key. |

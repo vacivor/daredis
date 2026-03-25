@@ -1,5 +1,19 @@
 part of '../../daredis.dart';
 
+class ZSetScoredMember {
+  final String member;
+  final double score;
+
+  ZSetScoredMember(this.member, this.score);
+}
+
+class ZSetPopResult {
+  final String key;
+  final List<ZSetScoredMember> entries;
+
+  ZSetPopResult(this.key, this.entries);
+}
+
 mixin RedisSortedSetCommands on RedisCommandExecutor {
   Future<int> zAdd(
     String key,
@@ -55,6 +69,15 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  Future<List<String>> zRandMember(String key, [int? count]) async {
+    final args = <dynamic>['ZRANDMEMBER', key];
+    if (count != null) args.add(count);
+    final res = await sendCommand(args);
+    if (res is List) return res.map((value) => value.toString()).toList();
+    if (res != null) return [res.toString()];
+    return const [];
+  }
+
   Future<List<String>> zRange(
     String key,
     int start,
@@ -107,6 +130,23 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     return [];
   }
 
+  Future<List<String>> zRevRangeByScore(
+    String key,
+    dynamic max,
+    dynamic min, {
+    bool withScores = false,
+    int? offset,
+    int? count,
+  }) async {
+    final args = <dynamic>['ZREVRANGEBYSCORE', key, max, min];
+    if (withScores) args.add('WITHSCORES');
+    if (offset != null && count != null) args.addAll(['LIMIT', offset, count]);
+
+    final res = await sendCommand(args);
+    if (res is List) return res.map((e) => e.toString()).toList();
+    return const [];
+  }
+
   Future<int> zRemRangeByScore(String key, dynamic min, dynamic max) async {
     final res = await sendCommand(['ZREMRANGEBYSCORE', key, min, max]);
     return Decoders.toInt(res);
@@ -141,6 +181,20 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     return [];
   }
 
+  Future<List<String>> zRevRangeByLex(
+    String key,
+    String max,
+    String min, {
+    int? offset,
+    int? count,
+  }) async {
+    final args = <dynamic>['ZREVRANGEBYLEX', key, max, min];
+    if (offset != null && count != null) args.addAll(['LIMIT', offset, count]);
+    final res = await sendCommand(args);
+    if (res is List) return res.map((e) => e.toString()).toList();
+    return const [];
+  }
+
   Future<List<String>> zInter(
     int numKeys,
     List<String> keys, {
@@ -151,6 +205,13 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final res = await sendCommand(args);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
+  }
+
+  Future<int> zInterCard(int numKeys, List<String> keys, {int? limit}) async {
+    final args = <dynamic>['ZINTERCARD', numKeys, ...keys];
+    if (limit != null) args.addAll(['LIMIT', limit]);
+    final res = await sendCommand(args);
+    return Decoders.toInt(res);
   }
 
   Future<List<String>> zUnion(
@@ -181,6 +242,22 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
       destination,
       numKeys,
       ...keys,
+    ]);
+    return Decoders.toInt(res);
+  }
+
+  Future<int> zRangeStore(
+    String destination,
+    String source,
+    int start,
+    int stop,
+  ) async {
+    final res = await sendCommand([
+      'ZRANGESTORE',
+      destination,
+      source,
+      start,
+      stop,
     ]);
     return Decoders.toInt(res);
   }
@@ -218,6 +295,12 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     return Decoders.toDouble(res);
   }
 
+  Future<List<double?>> zMScore(String key, List<String> members) async {
+    final res = await sendCommand(['ZMSCORE', key, ...members]);
+    if (res is! List) return const [];
+    return res.map((value) => Decoders.toDoubleOrNull(value)).toList();
+  }
+
   Future<List<String>> zPopMin(String key, [int? count]) async {
     final res = await sendCommand(['ZPOPMIN', key, ?count]);
     if (res is List) return res.map((e) => e.toString()).toList();
@@ -228,6 +311,39 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final res = await sendCommand(['ZPOPMAX', key, ?count]);
     if (res is List) return res.map((e) => e.toString()).toList();
     return [];
+  }
+
+  Future<ZSetPopResult?> zMPop(
+    List<String> keys,
+    String where, {
+    int? count,
+  }) async {
+    final args = <dynamic>['ZMPOP', keys.length, ...keys, where];
+    if (count != null) args.addAll(['COUNT', count]);
+    final res = await sendCommand(args);
+    return _parseZSetPopResult(res);
+  }
+
+  Future<ZSetPopResult?> bZMPop(
+    int timeout,
+    List<String> keys,
+    String where, {
+    int? count,
+  }) async {
+    final args = <dynamic>['BZMPOP', timeout, keys.length, ...keys, where];
+    if (count != null) args.addAll(['COUNT', count]);
+    final res = await sendCommand(args);
+    return _parseZSetPopResult(res);
+  }
+
+  Future<ZSetPopResult?> bZPopMin(List<String> keys, int timeout) async {
+    final res = await sendCommand(['BZPOPMIN', ...keys, timeout]);
+    return _parseBlockingZSetPopResult(res);
+  }
+
+  Future<ZSetPopResult?> bZPopMax(List<String> keys, int timeout) async {
+    final res = await sendCommand(['BZPOPMAX', ...keys, timeout]);
+    return _parseBlockingZSetPopResult(res);
   }
 
   Future<ScanResult<MapEntry<String, double>>> zScan(
@@ -253,5 +369,48 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
       return ScanResult(nextCursor, entries);
     }
     return const ScanResult(0, []);
+  }
+
+  ZSetPopResult? _parseZSetPopResult(dynamic res) {
+    if (res == null) return null;
+    if (res is List && res.length == 2 && res[1] is List) {
+      return ZSetPopResult(
+        res[0].toString(),
+        _parseScoredMembers(res[1]),
+      );
+    }
+    throw DaredisProtocolException('Unexpected sorted-set pop response: $res');
+  }
+
+  ZSetPopResult? _parseBlockingZSetPopResult(dynamic res) {
+    if (res == null) return null;
+    if (res is List && res.length == 3) {
+      return ZSetPopResult(
+        res[0].toString(),
+        [ZSetScoredMember(res[1].toString(), Decoders.toDouble(res[2]))],
+      );
+    }
+    throw DaredisProtocolException(
+      'Unexpected blocking sorted-set pop response: $res',
+    );
+  }
+
+  List<ZSetScoredMember> _parseScoredMembers(dynamic value) {
+    if (value is! List) {
+      throw DaredisProtocolException(
+        'Unexpected sorted-set member list response: $value',
+      );
+    }
+    return value.map((entry) {
+      if (entry is List && entry.length == 2) {
+        return ZSetScoredMember(
+          entry[0].toString(),
+          Decoders.toDouble(entry[1]),
+        );
+      }
+      throw DaredisProtocolException(
+        'Unexpected scored member response: $entry',
+      );
+    }).toList();
   }
 }

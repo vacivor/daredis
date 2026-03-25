@@ -47,3 +47,9 @@ abstract class RedisTransactionCapable {
   /// Opens a transaction session.
   Future<dynamic> openTransaction();
 }
+
+/// Capability interface for clients that can open a dedicated monitor session.
+abstract class RedisMonitorCapable {
+  /// Opens a MONITOR session.
+  Future<dynamic> openMonitor();
+}

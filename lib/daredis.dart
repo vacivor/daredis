@@ -12,6 +12,7 @@ import 'package:daredis/src/exceptions.dart';
 import 'package:daredis/src/redis_client.dart';
 
 export 'src/connect.dart';
+export 'src/monitor.dart';
 export 'src/pubsub.dart';
 export 'src/pubsub_message.dart';
 export 'src/redis_client.dart';

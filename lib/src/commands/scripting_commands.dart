@@ -45,6 +45,22 @@ mixin RedisScriptingCommands on RedisCommandExecutor {
     return sendCommand(['EVALSHA_RO', sha1, numKeys, ...keys, ...args]);
   }
 
+  Future<dynamic> fCall(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) {
+    return sendCommand(['FCALL', function, keys.length, ...keys, ...args]);
+  }
+
+  Future<dynamic> fCallRo(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) {
+    return sendCommand(['FCALL_RO', function, keys.length, ...keys, ...args]);
+  }
+
   Future<String?> evalString(
     String script,
     int numKeys,
@@ -162,6 +178,54 @@ mixin RedisScriptingCommands on RedisCommandExecutor {
     List<dynamic> args,
   ) => _decodeEval(
     () => evalShaRo(sha1, numKeys, keys, args),
+    Decoders.toStringList,
+  );
+
+  Future<String?> fCallString(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) => _decodeEval(
+    () => fCall(function, keys, args),
+    Decoders.toStringOrNull,
+  );
+
+  Future<int?> fCallInt(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) => _decodeEval(() => fCall(function, keys, args), Decoders.toIntOrNull);
+
+  Future<List<String>> fCallListString(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) => _decodeEval(() => fCall(function, keys, args), Decoders.toStringList);
+
+  Future<String?> fCallRoString(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) => _decodeEval(
+    () => fCallRo(function, keys, args),
+    Decoders.toStringOrNull,
+  );
+
+  Future<int?> fCallRoInt(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) => _decodeEval(
+    () => fCallRo(function, keys, args),
+    Decoders.toIntOrNull,
+  );
+
+  Future<List<String>> fCallRoListString(
+    String function,
+    List<String> keys,
+    List<dynamic> args,
+  ) => _decodeEval(
+    () => fCallRo(function, keys, args),
     Decoders.toStringList,
   );
 
