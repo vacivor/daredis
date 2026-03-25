@@ -113,10 +113,12 @@ Future<void> main() async {
 
   await cluster.connect();
 
-  await cluster.set('cart:{42}:total', '199');
-  print(await cluster.get('cart:{42}:total'));
-
-await cluster.close();
+  try {
+    await cluster.set('cart:{42}:total', '199');
+    print(await cluster.get('cart:{42}:total'));
+  } finally {
+    await cluster.close();
+  }
 }
 ```
 
@@ -149,8 +151,8 @@ Daredis
   -> Pool<Connection>
 
 DaredisCluster
-  -> Pool<_DaredisClusterConnection>
-     -> per-node Pool<Connection>
+  -> slot-aware router
+  -> per-node Pool<Connection>
 
 openPubSub()
   -> dedicated Connection
@@ -164,7 +166,7 @@ Why this matters:
 - ordinary commands can safely share pooled connections
 - Pub/Sub cannot share a normal command connection once subscribed
 - `WATCH/MULTI/EXEC` must stay on the same connection
-- cluster routing needs an extra layer that maps keys to nodes
+- cluster routing pins keyed work to the correct node pool
 
 ### Command Surface Design
 
@@ -297,6 +299,9 @@ await client.sendCommand(['PUBLISH', 'news', 'hello world']);
 await sub.cancel();
 await pubsub.close();
 ```
+
+`RedisPubSub.close()` is terminal for that session. After closing, the message
+stream finishes and the same session cannot be reopened.
 
 You can also consume messages in a pull style:
 
