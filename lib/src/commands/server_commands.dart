@@ -382,6 +382,15 @@ class RedisLatencyLatestEvent {
   });
 }
 
+enum HotKeysMetric {
+  cpu('CPU'),
+  net('NET');
+
+  final String token;
+
+  const HotKeysMetric(this.token);
+}
+
 class RedisRoleReplica {
   final String host;
   final int port;
@@ -452,195 +461,18 @@ List<Map<String, dynamic>> _serverReplyAsMapList(dynamic value) {
   );
 }
 
-mixin RedisServerCommands on RedisCommandExecutor {
-  Future<String> auth(String password, {String? username}) async {
-    final args = <dynamic>['AUTH'];
-    if (username != null) args.add(username);
-    args.add(password);
-    final res = await sendCommand(args);
-    return Decoders.string(res);
-  }
-
-  Future<Map<String, dynamic>> hello({
-    int protocolVersion = 3,
-    String? username,
-    String? password,
-    String? clientName,
-  }) async {
-    if ((username == null) != (password == null)) {
-      throw ArgumentError('HELLO AUTH requires both username and password');
-    }
-
-    final args = <dynamic>['HELLO', protocolVersion];
-    if (username != null && password != null) {
-      args.addAll(['AUTH', username, password]);
-    }
-    if (clientName != null) {
-      args.addAll(['SETNAME', clientName]);
-    }
-    final res = await sendCommand(args);
-    return _serverReplyAsMap(res);
-  }
-
-  Future<String> ping([String? message]) async {
-    final args = ['PING'];
-    if (message != null) args.add(message);
-    final res = await sendCommand(args);
-    return Decoders.string(res);
-  }
-
-  Future<String> echo(String message) async {
-    final res = await sendCommand(['ECHO', message]);
-    return Decoders.string(res);
-  }
-
-  Future<String> info([String? section]) async {
-    final args = ['INFO'];
-    if (section != null) args.add(section);
-    final res = await sendCommand(args);
-    return Decoders.string(res);
-  }
-
+/// Dangerous administrative Redis commands that are intentionally not exposed
+/// on the default `Daredis` and `DaredisCluster` client surfaces.
+mixin RedisAdminCommands on RedisCommandExecutor {
   Future<String> configSet(String parameter, String value) async {
     final res = await sendCommand(['CONFIG', 'SET', parameter, value]);
     return Decoders.string(res);
-  }
-
-  Future<Map<String, String>> configGet(String parameter) async {
-    final res = await sendCommand(['CONFIG', 'GET', parameter]);
-    if (res is Map) {
-      return res.map(
-        (key, value) => MapEntry(key.toString(), value.toString()),
-      );
-    }
-    if (res is List && res.length % 2 == 0) {
-      final map = <String, String>{};
-      for (var i = 0; i < res.length; i += 2) {
-        map[res[i].toString()] = res[i + 1].toString();
-      }
-      return map;
-    }
-    return {};
-  }
-
-  Future<String> clientList() async {
-    final res = await sendCommand(['CLIENT', 'LIST']);
-    return Decoders.string(res);
-  }
-
-  Future<int> clientId() async {
-    final res = await sendCommand(['CLIENT', 'ID']);
-    return Decoders.toInt(res);
-  }
-
-  Future<String> clientSetName(String name) async {
-    final res = await sendCommand(['CLIENT', 'SETNAME', name]);
-    return Decoders.string(res);
-  }
-
-  Future<String?> clientGetName() async {
-    final res = await sendCommand(['CLIENT', 'GETNAME']);
-    return Decoders.toStringOrNull(res);
-  }
-
-  Future<String> clientKillByAddr(String addr) async {
-    final res = await sendCommand(['CLIENT', 'KILL', addr]);
-    return Decoders.string(res);
-  }
-
-  Future<dynamic> clientTracking({
-    bool enable = true,
-    int? redirect,
-    List<String>? prefixes,
-    bool bcast = false,
-    bool optIn = false,
-    bool optOut = false,
-    bool noLoop = false,
-  }) {
-    final args = <dynamic>['CLIENT', 'TRACKING', enable ? 'ON' : 'OFF'];
-    if (redirect != null) args.addAll(['REDIRECT', redirect]);
-    if (prefixes != null) {
-      for (final prefix in prefixes) {
-        args.addAll(['PREFIX', prefix]);
-      }
-    }
-    if (bcast) args.add('BCAST');
-    if (optIn) args.add('OPTIN');
-    if (optOut) args.add('OPTOUT');
-    if (noLoop) args.add('NOLOOP');
-    return sendCommand(args);
-  }
-
-  Future<String> clientTrackingOn({
-    int? redirect,
-    List<String>? prefixes,
-    bool bcast = false,
-    bool optIn = false,
-    bool optOut = false,
-    bool noLoop = false,
-  }) async {
-    final res = await clientTracking(
-      enable: true,
-      redirect: redirect,
-      prefixes: prefixes,
-      bcast: bcast,
-      optIn: optIn,
-      optOut: optOut,
-      noLoop: noLoop,
-    );
-    return Decoders.string(res);
-  }
-
-  Future<String> clientTrackingOff() async {
-    final res = await clientTracking(enable: false);
-    return Decoders.string(res);
-  }
-
-  Future<Map<String, dynamic>> clientTrackingInfo() async {
-    final res = await sendCommand(['CLIENT', 'TRACKINGINFO']);
-    return _serverReplyAsMap(res);
-  }
-
-  Future<String> clientUnpause() async {
-    final res = await sendCommand(['CLIENT', 'UNPAUSE']);
-    return Decoders.string(res);
-  }
-
-  Future<String> clientPause(int timeoutMs, {bool write = false}) async {
-    final args = <dynamic>[
-      'CLIENT',
-      'PAUSE',
-      timeoutMs,
-      write ? 'WRITE' : 'ALL',
-    ];
-    final res = await sendCommand(args);
-    return Decoders.string(res);
-  }
-
-  Future<List<int>> time() async {
-    final res = await sendCommand(['TIME']);
-    if (res is List && res.length == 2) {
-      return [int.parse(res[0].toString()), int.parse(res[1].toString())];
-    }
-    return [];
   }
 
   Future<dynamic> debug(String subcommand, [String? argument]) {
     final args = ['DEBUG', subcommand];
     if (argument != null) args.add(argument);
     return sendCommand(args);
-  }
-
-  Future<int> dbSize() async {
-    final res = await sendCommand(['DBSIZE']);
-    return Decoders.toInt(res);
-  }
-
-  Future<dynamic> role() => sendCommand(['ROLE']);
-
-  Future<RedisRoleInfo> roleInfo() async {
-    final res = await role();
-    return RedisRoleInfo.fromReply(res);
   }
 
   Future<String> replicaOf(String? host, int? port) async {
@@ -665,6 +497,126 @@ mixin RedisServerCommands on RedisCommandExecutor {
 
   Future<String> flushAll({bool? async}) async {
     final res = await sendCommand(['FLUSHALL', if (async == true) 'ASYNC']);
+    return Decoders.string(res);
+  }
+
+  Future<String> bgRewriteAof() async {
+    final res = await sendCommand(['BGREWRITEAOF']);
+    return Decoders.string(res);
+  }
+
+  Future<String> bgSave({bool schedule = false}) async {
+    final res = await sendCommand(['BGSAVE', if (schedule) 'SCHEDULE']);
+    return Decoders.string(res);
+  }
+
+  Future<String> failover({
+    String? targetHost,
+    int? targetPort,
+    bool force = false,
+    bool abort = false,
+    int? timeoutMs,
+  }) async {
+    if ((targetHost == null) != (targetPort == null)) {
+      throw ArgumentError(
+        'FAILOVER TO requires both targetHost and targetPort',
+      );
+    }
+    if (force && (targetHost == null || targetPort == null || timeoutMs == null)) {
+      throw ArgumentError(
+        'FAILOVER FORCE requires targetHost, targetPort, and timeoutMs',
+      );
+    }
+    if (abort &&
+        (targetHost != null || targetPort != null || force || timeoutMs != null)) {
+      throw ArgumentError('FAILOVER ABORT cannot be combined with other options');
+    }
+
+    final args = <dynamic>['FAILOVER'];
+    if (targetHost != null && targetPort != null) {
+      args.addAll(['TO', targetHost, targetPort]);
+      if (force) {
+        args.add('FORCE');
+      }
+    }
+    if (abort) {
+      args.add('ABORT');
+    }
+    if (timeoutMs != null) {
+      args.addAll(['TIMEOUT', timeoutMs]);
+    }
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<dynamic> hotKeys(List<dynamic> args) {
+    return sendCommand(['HOTKEYS', ...args]);
+  }
+
+  Future<String> hotKeysStart({
+    required int metricsCount,
+    required Set<HotKeysMetric> metrics,
+    int? count,
+    int? durationSeconds,
+    int? sampleRatio,
+    List<int>? slots,
+  }) async {
+    if (metrics.isEmpty) {
+      throw ArgumentError('HOTKEYS START requires at least one metric');
+    }
+    final args = <dynamic>['START', 'METRICS', metricsCount];
+    for (final metric in metrics) {
+      args.add(metric.token);
+    }
+    if (count != null) {
+      args.addAll(['COUNT', count]);
+    }
+    if (durationSeconds != null) {
+      args.addAll(['DURATION', durationSeconds]);
+    }
+    if (sampleRatio != null) {
+      args.addAll(['SAMPLE', sampleRatio]);
+    }
+    if (slots != null) {
+      args.addAll(['SLOTS', slots.length, ...slots]);
+    }
+    final res = await hotKeys(args);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>?> hotKeysGet() async {
+    final res = await hotKeys(['GET']);
+    if (res == null) {
+      return null;
+    }
+    return _serverReplyAsMap(res);
+  }
+
+  Future<String> hotKeysStop() async {
+    final res = await hotKeys(['STOP']);
+    return Decoders.string(res);
+  }
+
+  Future<String> hotKeysReset() async {
+    final res = await hotKeys(['RESET']);
+    return Decoders.string(res);
+  }
+
+  Future<int> lastSave() async {
+    final res = await sendCommand(['LASTSAVE']);
+    return Decoders.toInt(res);
+  }
+
+  Future<String> lolWut({
+    int? version,
+    List<int> arguments = const [],
+  }) async {
+    final args = <dynamic>['LOLWUT'];
+    if (version != null) {
+      args.addAll(['VERSION', version]);
+    }
+    args.addAll(arguments);
+    final res = await sendCommand(args);
     return Decoders.string(res);
   }
 
@@ -864,6 +816,564 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return Decoders.string(res);
   }
 
+  Future<dynamic> functionLoad(String code, {bool replace = false}) {
+    final args = ['FUNCTION', 'LOAD'];
+    if (replace) args.add('REPLACE');
+    args.add(code);
+    return sendCommand(args);
+  }
+
+  Future<dynamic> functionLoadReplace(String code) {
+    return functionLoad(code, replace: true);
+  }
+
+  Future<String> functionDelete(String libraryName) async {
+    final res = await sendCommand(['FUNCTION', 'DELETE', libraryName]);
+    return Decoders.string(res);
+  }
+
+  Future<String> functionFlush({bool async = false}) async {
+    final res = await sendCommand(['FUNCTION', 'FLUSH', if (async) 'ASYNC']);
+    return Decoders.string(res);
+  }
+
+  Future<dynamic> replConf(List<dynamic> args) {
+    return sendCommand(['REPLCONF', ...args]);
+  }
+
+  Future<dynamic> replConfListeningPort(int port) {
+    return replConf(['listening-port', port]);
+  }
+
+  Future<dynamic> replConfAck(int offset) {
+    return replConf(['ACK', offset]);
+  }
+
+  Future<dynamic> replConfCapabilities(List<String> capabilities) {
+    final args = <dynamic>[];
+    for (final capability in capabilities) {
+      args.addAll(['capa', capability]);
+    }
+    return replConf(args);
+  }
+
+  Future<dynamic> psync(String replicationId, int offset) {
+    return sendCommand(['PSYNC', replicationId, offset]);
+  }
+
+  Future<dynamic> sync() {
+    return sendCommand(['SYNC']);
+  }
+
+  Future<String> save() async {
+    final res = await sendCommand(['SAVE']);
+    return Decoders.string(res);
+  }
+
+  Future<String?> shutdown({
+    bool save = false,
+    bool noSave = false,
+    bool now = false,
+    bool force = false,
+    bool abort = false,
+  }) async {
+    if (save && noSave) {
+      throw ArgumentError('SHUTDOWN cannot combine save and noSave');
+    }
+    if (abort && (save || noSave || now || force)) {
+      throw ArgumentError('SHUTDOWN ABORT cannot be combined with other flags');
+    }
+    final args = <dynamic>['SHUTDOWN'];
+    if (save) {
+      args.add('SAVE');
+    } else if (noSave) {
+      args.add('NOSAVE');
+    }
+    if (now) {
+      args.add('NOW');
+    }
+    if (force) {
+      args.add('FORCE');
+    }
+    if (abort) {
+      args.add('ABORT');
+    }
+    final res = await sendCommand(args);
+    return Decoders.toStringOrNull(res);
+  }
+
+  Future<String> swapDb(int index1, int index2) async {
+    final res = await sendCommand(['SWAPDB', index1, index2]);
+    return Decoders.string(res);
+  }
+
+  Future<String> aclSetUser(List<dynamic> args) async {
+    final res = await sendCommand(['ACL', 'SETUSER', ...args]);
+    return Decoders.string(res);
+  }
+
+  Future<String> aclSetUserRules(String username, List<dynamic> rules) async {
+    return aclSetUser([username, ...rules]);
+  }
+
+  Future<int> aclDelUser(List<String> users) async {
+    final res = await sendCommand(['ACL', 'DELUSER', ...users]);
+    return Decoders.toInt(res);
+  }
+
+  Future<String> aclLoad() async {
+    final res = await sendCommand(['ACL', 'LOAD']);
+    return Decoders.string(res);
+  }
+
+  Future<String> aclSave() async {
+    final res = await sendCommand(['ACL', 'SAVE']);
+    return Decoders.string(res);
+  }
+}
+
+/// Safe read-mostly server helpers exposed on the default client APIs.
+mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
+  Future<int> commandCount() async {
+    final res = await sendCommand(['COMMAND', 'COUNT']);
+    return Decoders.toInt(res);
+  }
+
+  Future<Map<String, dynamic>> commandDocs([List<String>? commands]) async {
+    final res = await sendCommand([
+      'COMMAND',
+      'DOCS',
+      if (commands != null) ...commands,
+    ]);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<Map<String, dynamic>> commandDocsFor(List<String> commands) {
+    return commandDocs(commands);
+  }
+
+  Future<List<RedisCommandDoc>> commandDocEntriesFor(
+    List<String> commands,
+  ) async {
+    final docs = await commandDocs(commands);
+    return docs.entries
+        .map((entry) => RedisCommandDoc.fromReply(entry.key, entry.value))
+        .toList(growable: false);
+  }
+
+  Future<List<dynamic>> commandInfo([List<String>? commands]) async {
+    final res = await sendCommand([
+      'COMMAND',
+      'INFO',
+      if (commands != null) ...commands,
+    ]);
+    if (res is List) {
+      return List<dynamic>.from(res);
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> commandInfoFor(List<String> commands) {
+    return commandInfo(commands);
+  }
+
+  Future<List<RedisCommandInfoEntry>> commandInfoEntriesFor(
+    List<String> commands,
+  ) async {
+    final entries = await commandInfo(commands);
+    return entries
+        .map((entry) => RedisCommandInfoEntry.fromReply(entry))
+        .toList();
+  }
+
+  Future<List<dynamic>> commandList() async {
+    final res = await sendCommand(['COMMAND']);
+    if (res is List) return res;
+    return [];
+  }
+
+  Future<List<dynamic>> slowlogGet([int? count]) async {
+    final args = <dynamic>['SLOWLOG', 'GET'];
+    if (count != null) args.add(count);
+    final res = await sendCommand(args);
+    if (res is List) return res;
+    return [];
+  }
+
+  Future<int> slowlogLen() async {
+    final res = await sendCommand(['SLOWLOG', 'LEN']);
+    return Decoders.toInt(res);
+  }
+
+  Future<String> slowlogReset() async {
+    final res = await sendCommand(['SLOWLOG', 'RESET']);
+    return Decoders.string(res);
+  }
+
+  Future<String> memoryDoctor() async {
+    final res = await sendCommand(['MEMORY', 'DOCTOR']);
+    return Decoders.string(res);
+  }
+
+  Future<String> memoryMallocStats() async {
+    final res = await sendCommand(['MEMORY', 'MALLOC-STATS']);
+    return Decoders.string(res);
+  }
+
+  Future<String> memoryPurge() async {
+    final res = await sendCommand(['MEMORY', 'PURGE']);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> memoryStats() async {
+    final res = await sendCommand(['MEMORY', 'STATS']);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<String> latencyDoctor() async {
+    final res = await sendCommand(['LATENCY', 'DOCTOR']);
+    return Decoders.string(res);
+  }
+
+  Future<String> latencyGraph(String event) async {
+    final res = await sendCommand(['LATENCY', 'GRAPH', event]);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> latencyHistogram([List<String>? commands]) async {
+    final res = await sendCommand([
+      'LATENCY',
+      'HISTOGRAM',
+      if (commands != null) ...commands,
+    ]);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<List<RedisLatencySample>> latencyHistory(String event) async {
+    final res = await sendCommand(['LATENCY', 'HISTORY', event]);
+    if (res is! List) return const [];
+    return res.whereType<List>().map((entry) {
+      return RedisLatencySample(
+        timestamp: int.parse(entry[0].toString()),
+        latencyMilliseconds: int.parse(entry[1].toString()),
+      );
+    }).toList(growable: false);
+  }
+
+  Future<List<RedisLatencyLatestEvent>> latencyLatest() async {
+    final res = await sendCommand(['LATENCY', 'LATEST']);
+    if (res is! List) return const [];
+    return res.whereType<List>().map((entry) {
+      return RedisLatencyLatestEvent(
+        event: entry[0].toString(),
+        timestamp: int.parse(entry[1].toString()),
+        latestLatencyMilliseconds: int.parse(entry[2].toString()),
+        maxLatencyMilliseconds: int.parse(entry[3].toString()),
+      );
+    }).toList(growable: false);
+  }
+
+  Future<int> latencyReset([List<String>? events]) async {
+    final res = await sendCommand([
+      'LATENCY',
+      'RESET',
+      if (events != null) ...events,
+    ]);
+    return Decoders.toInt(res);
+  }
+
+  Future<List<Map<String, dynamic>>> moduleList() async {
+    final res = await sendCommand(['MODULE', 'LIST']);
+    return _serverReplyAsMapList(res);
+  }
+
+  Future<List<Map<String, dynamic>>> functionList({
+    String? libraryName,
+    bool withCode = false,
+  }) async {
+    final args = ['FUNCTION', 'LIST'];
+    if (libraryName != null) args.addAll(['LIBRARYNAME', libraryName]);
+    if (withCode) args.add('WITHCODE');
+    final res = await sendCommand(args);
+    return _serverReplyAsMapList(res);
+  }
+
+  Future<List<Map<String, dynamic>>> functionListLibraries({
+    bool withCode = false,
+  }) {
+    return functionList(withCode: withCode);
+  }
+
+  Future<List<RedisFunctionLibrary>> functionLibraryEntries({
+    String? libraryName,
+    bool withCode = false,
+  }) async {
+    final libraries = await functionList(
+      libraryName: libraryName,
+      withCode: withCode,
+    );
+    return libraries
+        .map((library) => RedisFunctionLibrary.fromReply(library))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> functionStats() async {
+    final res = await sendCommand(['FUNCTION', 'STATS']);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<RedisFunctionStats> functionStatsEntry() async {
+    final res = await sendCommand(['FUNCTION', 'STATS']);
+    return RedisFunctionStats.fromReply(res);
+  }
+
+  Future<List<String>> aclList() async {
+    final res = await sendCommand(['ACL', 'LIST']);
+    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is String) return res.split('\n');
+    return [];
+  }
+
+  Future<List<String>> aclUsers() async {
+    final res = await sendCommand(['ACL', 'USERS']);
+    if (res is List) return res.map((e) => e.toString()).toList();
+    return [];
+  }
+
+  Future<List<String>> aclCat([String? category]) async {
+    final args = <dynamic>['ACL', 'CAT'];
+    if (category != null) args.add(category);
+    final res = await sendCommand(args);
+    if (res is List) return res.map((e) => e.toString()).toList();
+    return [];
+  }
+
+  Future<String> aclDryRun(
+    String username,
+    String command, [
+    List<String> args = const [],
+  ]) async {
+    final res = await sendCommand(['ACL', 'DRYRUN', username, command, ...args]);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> aclGetUser(String username) async {
+    final res = await sendCommand(['ACL', 'GETUSER', username]);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<String> aclWhoAmI() async {
+    final res = await sendCommand(['ACL', 'WHOAMI']);
+    return Decoders.string(res);
+  }
+
+  Future<String> aclGenPass([int? bits]) async {
+    final args = <dynamic>['ACL', 'GENPASS'];
+    if (bits != null) args.add(bits);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<dynamic> aclLog([int? count]) {
+    final args = <dynamic>['ACL', 'LOG'];
+    if (count != null) args.add(count);
+    return sendCommand(args);
+  }
+
+  Future<List<dynamic>> aclLogEntries([int? count]) async {
+    final res = await aclLog(count);
+    if (res is List) {
+      return res.map(_normalizeServerReply).toList();
+    }
+    return [];
+  }
+
+  Future<String> aclLogReset() async {
+    final res = await sendCommand(['ACL', 'LOG', 'RESET']);
+    return Decoders.string(res);
+  }
+}
+
+mixin RedisServerCommands on RedisCommandExecutor {
+  Future<String> auth(String password, {String? username}) async {
+    final args = <dynamic>['AUTH'];
+    if (username != null) args.add(username);
+    args.add(password);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> hello({
+    int protocolVersion = 3,
+    String? username,
+    String? password,
+    String? clientName,
+  }) async {
+    if ((username == null) != (password == null)) {
+      throw ArgumentError('HELLO AUTH requires both username and password');
+    }
+
+    final args = <dynamic>['HELLO', protocolVersion];
+    if (username != null && password != null) {
+      args.addAll(['AUTH', username, password]);
+    }
+    if (clientName != null) {
+      args.addAll(['SETNAME', clientName]);
+    }
+    final res = await sendCommand(args);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<String> ping([String? message]) async {
+    final args = ['PING'];
+    if (message != null) args.add(message);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<String> echo(String message) async {
+    final res = await sendCommand(['ECHO', message]);
+    return Decoders.string(res);
+  }
+
+  Future<String> info([String? section]) async {
+    final args = ['INFO'];
+    if (section != null) args.add(section);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, String>> configGet(String parameter) async {
+    final res = await sendCommand(['CONFIG', 'GET', parameter]);
+    if (res is Map) {
+      return res.map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      );
+    }
+    if (res is List && res.length % 2 == 0) {
+      final map = <String, String>{};
+      for (var i = 0; i < res.length; i += 2) {
+        map[res[i].toString()] = res[i + 1].toString();
+      }
+      return map;
+    }
+    return {};
+  }
+
+  Future<String> clientList() async {
+    final res = await sendCommand(['CLIENT', 'LIST']);
+    return Decoders.string(res);
+  }
+
+  Future<int> clientId() async {
+    final res = await sendCommand(['CLIENT', 'ID']);
+    return Decoders.toInt(res);
+  }
+
+  Future<String> clientSetName(String name) async {
+    final res = await sendCommand(['CLIENT', 'SETNAME', name]);
+    return Decoders.string(res);
+  }
+
+  Future<String?> clientGetName() async {
+    final res = await sendCommand(['CLIENT', 'GETNAME']);
+    return Decoders.toStringOrNull(res);
+  }
+
+  Future<String> clientKillByAddr(String addr) async {
+    final res = await sendCommand(['CLIENT', 'KILL', addr]);
+    return Decoders.string(res);
+  }
+
+  Future<dynamic> clientTracking({
+    bool enable = true,
+    int? redirect,
+    List<String>? prefixes,
+    bool bcast = false,
+    bool optIn = false,
+    bool optOut = false,
+    bool noLoop = false,
+  }) {
+    final args = <dynamic>['CLIENT', 'TRACKING', enable ? 'ON' : 'OFF'];
+    if (redirect != null) args.addAll(['REDIRECT', redirect]);
+    if (prefixes != null) {
+      for (final prefix in prefixes) {
+        args.addAll(['PREFIX', prefix]);
+      }
+    }
+    if (bcast) args.add('BCAST');
+    if (optIn) args.add('OPTIN');
+    if (optOut) args.add('OPTOUT');
+    if (noLoop) args.add('NOLOOP');
+    return sendCommand(args);
+  }
+
+  Future<String> clientTrackingOn({
+    int? redirect,
+    List<String>? prefixes,
+    bool bcast = false,
+    bool optIn = false,
+    bool optOut = false,
+    bool noLoop = false,
+  }) async {
+    final res = await clientTracking(
+      enable: true,
+      redirect: redirect,
+      prefixes: prefixes,
+      bcast: bcast,
+      optIn: optIn,
+      optOut: optOut,
+      noLoop: noLoop,
+    );
+    return Decoders.string(res);
+  }
+
+  Future<String> clientTrackingOff() async {
+    final res = await clientTracking(enable: false);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> clientTrackingInfo() async {
+    final res = await sendCommand(['CLIENT', 'TRACKINGINFO']);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<String> clientUnpause() async {
+    final res = await sendCommand(['CLIENT', 'UNPAUSE']);
+    return Decoders.string(res);
+  }
+
+  Future<String> clientPause(int timeoutMs, {bool write = false}) async {
+    final args = <dynamic>[
+      'CLIENT',
+      'PAUSE',
+      timeoutMs,
+      write ? 'WRITE' : 'ALL',
+    ];
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<List<int>> time() async {
+    final res = await sendCommand(['TIME']);
+    if (res is List && res.length == 2) {
+      return [int.parse(res[0].toString()), int.parse(res[1].toString())];
+    }
+    return [];
+  }
+
+  Future<int> dbSize() async {
+    final res = await sendCommand(['DBSIZE']);
+    return Decoders.toInt(res);
+  }
+
+  Future<dynamic> role() => sendCommand(['ROLE']);
+
+  Future<RedisRoleInfo> roleInfo() async {
+    final res = await role();
+    return RedisRoleInfo.fromReply(res);
+  }
+
   Future<List<String>> pubSubChannels([String? pattern]) async {
     final args = ['PUBSUB', 'CHANNELS'];
     if (pattern != null) args.add(pattern);
@@ -919,22 +1429,6 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
-  Future<dynamic> functionLoad(String code, {bool replace = false}) {
-    final args = ['FUNCTION', 'LOAD'];
-    if (replace) args.add('REPLACE');
-    args.add(code);
-    return sendCommand(args);
-  }
-
-  Future<dynamic> functionLoadReplace(String code) {
-    return functionLoad(code, replace: true);
-  }
-
-  Future<String> functionDelete(String libraryName) async {
-    final res = await sendCommand(['FUNCTION', 'DELETE', libraryName]);
-    return Decoders.string(res);
-  }
-
   Future<List<Map<String, dynamic>>> functionList({
     String? libraryName,
     bool withCode = false,
@@ -975,11 +1469,6 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return RedisFunctionStats.fromReply(res);
   }
 
-  Future<String> functionFlush({bool async = false}) async {
-    final res = await sendCommand(['FUNCTION', 'FLUSH', if (async) 'ASYNC']);
-    return Decoders.string(res);
-  }
-
   Future<List<String>> aclList() async {
     final res = await sendCommand(['ACL', 'LIST']);
     if (res is List) return res.map((e) => e.toString()).toList();
@@ -1015,32 +1504,8 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return _serverReplyAsMap(res);
   }
 
-  Future<String> aclSetUser(List<dynamic> args) async {
-    final res = await sendCommand(['ACL', 'SETUSER', ...args]);
-    return Decoders.string(res);
-  }
-
-  Future<String> aclSetUserRules(String username, List<dynamic> rules) async {
-    return aclSetUser([username, ...rules]);
-  }
-
-  Future<int> aclDelUser(List<String> users) async {
-    final res = await sendCommand(['ACL', 'DELUSER', ...users]);
-    return Decoders.toInt(res);
-  }
-
   Future<String> aclWhoAmI() async {
     final res = await sendCommand(['ACL', 'WHOAMI']);
-    return Decoders.string(res);
-  }
-
-  Future<String> aclLoad() async {
-    final res = await sendCommand(['ACL', 'LOAD']);
-    return Decoders.string(res);
-  }
-
-  Future<String> aclSave() async {
-    final res = await sendCommand(['ACL', 'SAVE']);
     return Decoders.string(res);
   }
 

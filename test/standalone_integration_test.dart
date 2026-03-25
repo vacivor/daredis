@@ -459,7 +459,7 @@ void main() {
 
       addTearDown(() async {
         try {
-          await client.functionDelete(libraryName);
+          await client.sendCommand(['FUNCTION', 'DELETE', libraryName]);
         } catch (_) {}
       });
 
@@ -470,7 +470,12 @@ void main() {
       expect(currentUser, isNotEmpty);
       expect(await client.aclLogReset(), 'OK');
 
-      final loaded = await client.functionLoadReplace(functionCode);
+      final loaded = await client.sendCommand([
+        'FUNCTION',
+        'LOAD',
+        'REPLACE',
+        functionCode,
+      ]);
       expect(loaded.toString(), contains(libraryName));
 
       final libraries = await client.functionListLibraries();

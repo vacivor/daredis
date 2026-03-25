@@ -4,6 +4,7 @@ import '../daredis.dart';
 class Daredis extends RedisClient
     with
         RedisServerCommands,
+        RedisServerIntrospectionCommands,
         RedisStringCommands,
         RedisKeyCommands,
         RedisListCommands,

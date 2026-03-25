@@ -82,6 +82,7 @@ class ClusterOptions {
 class DaredisCluster extends RedisClusterClient
     with
         RedisServerCommands,
+        RedisServerIntrospectionCommands,
         RedisStringCommands,
         RedisKeyCommands,
         RedisListCommands,

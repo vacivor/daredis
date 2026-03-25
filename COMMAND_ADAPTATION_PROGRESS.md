@@ -9,15 +9,16 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 - `Helper`: `Yes` means a typed helper appears to exist; `Family` means support exists at the command-family level but may not be exposed as a dedicated helper for that exact command; `No` means raw `sendCommand()` only.
 - `Cluster`: `Yes` means `ClusterCommandSpec` has direct support; `Family` means routing is handled by a family-level parser or no-key family rule; `No` means no dedicated local routing support.
 - `Status`: a compact summary derived from `Helper` and `Cluster`.
+- Some dangerous administrative helpers are intentionally isolated in `RedisAdminCommands` and are not mixed into the default `Daredis` / `DaredisCluster` client APIs.
 
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 328
+- Ready: 344
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 103
+- Raw only: 87
 
 ## String commands
 
@@ -406,19 +407,19 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `ACL CAT` | Yes | Yes | Ready | Lists ACL categories or the commands inside one category. |
-| `ACL DELUSER` | Yes | Yes | Ready | Deletes ACL users, and terminates their connections. |
+| `ACL DELUSER` | Yes | Yes | Ready | Admin-only helper. Deletes ACL users, and terminates their connections. |
 | `ACL DRYRUN` | Yes | Yes | Ready | Simulates whether a user may execute a command. |
 | `ACL GENPASS` | Yes | Yes | Ready | Generates a pseudorandom, secure password that can be used to identify ACL users. |
 | `ACL GETUSER` | Yes | Yes | Ready | Lists the ACL rules of a user. |
 | `ACL LIST` | Yes | Yes | Ready | Dumps the effective rules in ACL file format. |
-| `ACL LOAD` | Yes | Yes | Ready | Reloads ACL rules from the ACL file. |
+| `ACL LOAD` | Yes | Yes | Ready | Admin-only helper. Reloads ACL rules from the ACL file. |
 | `ACL LOG` | Yes | Yes | Ready | Lists recent security events generated due to ACL rules. |
-| `ACL SAVE` | Yes | Yes | Ready | Saves ACL rules to the ACL file. |
-| `ACL SETUSER` | Yes | Yes | Ready | Creates and modifies an ACL user and its rules. |
+| `ACL SAVE` | Yes | Yes | Ready | Admin-only helper. Saves ACL rules to the ACL file. |
+| `ACL SETUSER` | Yes | Yes | Ready | Admin-only helper. Creates and modifies an ACL user and its rules. |
 | `ACL USERS` | Yes | Yes | Ready | Lists all ACL users. |
 | `ACL WHOAMI` | Yes | Yes | Ready | Returns the authenticated username of the current connection. |
-| `BGREWRITEAOF` | No | No | Raw only | Raw only |
-| `BGSAVE` | No | No | Raw only | Raw only |
+| `BGREWRITEAOF` | Yes | Yes | Ready | Admin-only helper. Starts an append-only file rewrite in the background. |
+| `BGSAVE` | Yes | Yes | Ready | Admin-only helper. Starts a background save, with optional scheduling when an AOF rewrite is active. |
 | `COMMAND` | Yes | Yes | Ready | Returns detailed information about all commands. |
 | `COMMAND COUNT` | Yes | Yes | Ready | Returns a count of commands. |
 | `COMMAND DOCS` | Yes | Yes | Ready | Returns documentary information about one, multiple or all commands. |
@@ -428,49 +429,49 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `COMMAND LIST` | Yes | Yes | Ready | Returns a list of command names. |
 | `CONFIG GET` | Yes | Yes | Ready | Returns the effective values of configuration parameters. |
 | `CONFIG RESETSTAT` | Yes | Yes | Ready | Resets the server's statistics. |
-| `CONFIG REWRITE` | Yes | Yes | Ready | Persists the effective configuration to file. |
-| `CONFIG SET` | Yes | Yes | Ready | Sets configuration parameters in-flight. |
+| `CONFIG REWRITE` | Yes | Yes | Ready | Admin-only helper. Persists the effective configuration to file. |
+| `CONFIG SET` | Yes | Yes | Ready | Admin-only helper. Sets configuration parameters in-flight. |
 | `DBSIZE` | Yes | Yes | Ready | Returns the number of keys in the database. |
-| `FAILOVER` | No | No | Raw only | Raw only |
-| `FLUSHALL` | Yes | Yes | Ready | Removes all keys from all databases. |
-| `FLUSHDB` | Yes | Yes | Ready | Remove all keys from the current database. |
-| `HOTKEYS` | No | No | Raw only | Raw only |
-| `HOTKEYS GET` | No | No | Raw only | Raw only |
-| `HOTKEYS RESET` | No | No | Raw only | Raw only |
-| `HOTKEYS START` | No | No | Raw only | Raw only |
-| `HOTKEYS STOP` | No | No | Raw only | Raw only |
+| `FAILOVER` | Yes | Yes | Ready | Admin-only helper. Starts a coordinated failover with typed target, timeout, force, and abort options. |
+| `FLUSHALL` | Yes | Yes | Ready | Admin-only helper. Removes all keys from all databases. |
+| `FLUSHDB` | Yes | Yes | Ready | Admin-only helper. Remove all keys from the current database. |
+| `HOTKEYS` | Yes | Yes | Ready | Admin-only helper family with explicit subcommand wrappers for tracking hot keys. |
+| `HOTKEYS GET` | Yes | Yes | Ready | Admin-only helper. Returns normalized hot key tracking results as a map, or null when no session exists. |
+| `HOTKEYS RESET` | Yes | Yes | Ready | Admin-only helper. Releases the resources used for hot key tracking. |
+| `HOTKEYS START` | Yes | Yes | Ready | Admin-only helper. Starts hot key tracking with explicit metric, duration, sampling, and slot options. |
+| `HOTKEYS STOP` | Yes | Yes | Ready | Admin-only helper. Stops hot key tracking while preserving collected results. |
 | `INFO` | Yes | Yes | Ready | Returns information and statistics about the server. |
-| `LASTSAVE` | No | No | Raw only | Raw only |
+| `LASTSAVE` | Yes | Yes | Ready | Returns the Unix timestamp of the last successful persistence save. |
 | `LATENCY DOCTOR` | Yes | Family | Ready | Returns a human-readable latency analysis report. |
 | `LATENCY GRAPH` | Yes | Family | Ready | Returns an ASCII latency graph for an event. |
 | `LATENCY HISTOGRAM` | Yes | Family | Ready | Returns per-command latency histograms as normalized maps. |
 | `LATENCY HISTORY` | Yes | Family | Ready | Returns timestamp-latency samples for an event. |
 | `LATENCY LATEST` | Yes | Family | Ready | Returns the latest latency samples for all events. |
 | `LATENCY RESET` | Yes | Family | Ready | Resets latency samples for one or more events. |
-| `LOLWUT` | No | No | Raw only | Raw only |
+| `LOLWUT` | Yes | Yes | Ready | Admin-only helper. Returns the generated LOLWUT output with optional version-specific arguments. |
 | `MEMORY DOCTOR` | Yes | Yes | Ready | Outputs a memory problems report. |
 | `MEMORY MALLOC-STATS` | Yes | Yes | Ready | Returns allocator statistics as a raw report string. |
 | `MEMORY PURGE` | Yes | Yes | Ready | Asks the allocator to release memory. |
 | `MEMORY STATS` | Yes | Yes | Ready | Returns details about memory usage. |
 | `MEMORY USAGE` | Yes | Yes | Ready | Estimates the memory usage of a key. |
 | `MODULE LIST` | Yes | Family | Ready | Returns the loaded modules as normalized maps. |
-| `MODULE LOAD` | Yes | Family | Ready | Loads a module from a shared library path. |
-| `MODULE LOADEX` | Yes | Family | Ready | Loads a module with CONFIG and ARGS sections. |
-| `MODULE UNLOAD` | Yes | Family | Ready | Unloads a module by name. |
+| `MODULE LOAD` | Yes | Family | Ready | Admin-only helper. Loads a module from a shared library path. |
+| `MODULE LOADEX` | Yes | Family | Ready | Admin-only helper. Loads a module with CONFIG and ARGS sections. |
+| `MODULE UNLOAD` | Yes | Family | Ready | Admin-only helper. Unloads a module by name. |
 | `MONITOR` | Yes | Yes | Ready | Dedicated monitor session with a streaming message API. |
-| `PSYNC` | No | No | Raw only | Raw only |
-| `REPLCONF` | No | No | Raw only | Raw only |
-| `REPLICAOF` | Yes | Yes | Ready | Configures a server as replica of another, or promotes it to a master. |
+| `PSYNC` | Yes | Yes | Ready | Admin-only helper. Low-level replication helper for issuing a PSYNC handshake on a dedicated connection. |
+| `REPLCONF` | Yes | Yes | Ready | Admin-only helper. Low-level replication helper with typed wrappers for common REPLCONF forms. |
+| `REPLICAOF` | Yes | Yes | Ready | Admin-only helper. Configures a server as replica of another, or promotes it to a master. |
 | `RESTORE-ASKING` | Yes | Yes | Ready | Restores a serialized key on an importing cluster node. |
 | `ROLE` | Yes | Yes | Ready | Returns the replication role. |
-| `SAVE` | No | No | Raw only | Raw only |
-| `SHUTDOWN` | No | No | Raw only | Raw only |
-| `SLAVEOF` | Yes | Yes | Ready | Deprecated alias of REPLICAOF. |
+| `SAVE` | Yes | Yes | Ready | Admin-only helper. Performs a synchronous database save. |
+| `SHUTDOWN` | Yes | Yes | Ready | Admin-only helper. Builds validated shutdown flag combinations and returns OK for abort flows. |
+| `SLAVEOF` | Yes | Yes | Ready | Admin-only helper. Deprecated alias of REPLICAOF. |
 | `SLOWLOG GET` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
 | `SLOWLOG LEN` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
 | `SLOWLOG RESET` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
-| `SWAPDB` | No | No | Raw only | Raw only |
-| `SYNC` | No | No | Raw only | Raw only |
+| `SWAPDB` | Yes | Yes | Ready | Admin-only helper. Swaps two logical Redis databases. |
+| `SYNC` | Yes | Yes | Ready | Admin-only helper. Low-level replication helper for issuing SYNC on a dedicated connection. |
 | `TIME` | Yes | Yes | Ready | Returns the server time. |
 ## Cluster commands
 

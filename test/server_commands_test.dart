@@ -1,7 +1,19 @@
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
-class _FakeServerExecutor extends RedisCommandExecutor with RedisServerCommands {
+class _FakeServerExecutor extends RedisCommandExecutor
+    with RedisServerCommands, RedisServerIntrospectionCommands {
+  List<dynamic>? lastCommand;
+  dynamic response;
+
+  @override
+  Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) async {
+    lastCommand = List<dynamic>.from(command);
+    return response;
+  }
+}
+
+class _FakeAdminExecutor extends RedisCommandExecutor with RedisAdminCommands {
   List<dynamic>? lastCommand;
   dynamic response;
 
@@ -76,7 +88,7 @@ void main() {
     });
 
     test('slaveOf delegates to SLAVEOF syntax', () async {
-      final executor = _FakeServerExecutor()..response = 'OK';
+      final executor = _FakeAdminExecutor()..response = 'OK';
 
       final result = await executor.slaveOf('127.0.0.1', 6379);
 
@@ -85,7 +97,7 @@ void main() {
     });
 
     test('slaveOf null target maps to REPLICAOF NO ONE', () async {
-      final executor = _FakeServerExecutor()..response = 'OK';
+      final executor = _FakeAdminExecutor()..response = 'OK';
 
       final result = await executor.slaveOf(null, null);
 
@@ -110,7 +122,7 @@ void main() {
     });
 
     test('moduleLoad builds MODULE LOAD', () async {
-      final executor = _FakeServerExecutor()..response = 'OK';
+      final executor = _FakeAdminExecutor()..response = 'OK';
 
       final result = await executor.moduleLoad('/tmp/search.so', ['MAXDOCTABLESIZE', '10']);
 
@@ -125,7 +137,7 @@ void main() {
     });
 
     test('moduleLoadEx builds MODULE LOADEX with configs and args', () async {
-      final executor = _FakeServerExecutor()..response = 'OK';
+      final executor = _FakeAdminExecutor()..response = 'OK';
 
       final result = await executor.moduleLoadEx(
         '/tmp/search.so',
@@ -151,12 +163,145 @@ void main() {
     });
 
     test('moduleUnload builds MODULE UNLOAD', () async {
-      final executor = _FakeServerExecutor()..response = 'OK';
+      final executor = _FakeAdminExecutor()..response = 'OK';
 
       final result = await executor.moduleUnload('search');
 
       expect(result, 'OK');
       expect(executor.lastCommand, ['MODULE', 'UNLOAD', 'search']);
+    });
+
+    test('background persistence helpers build exact commands', () async {
+      final executor = _FakeAdminExecutor()
+        ..response = 'Background append only file rewriting started';
+
+      expect(
+        await executor.bgRewriteAof(),
+        'Background append only file rewriting started',
+      );
+      expect(executor.lastCommand, ['BGREWRITEAOF']);
+
+      executor.response = 'Background saving scheduled';
+      expect(await executor.bgSave(schedule: true), 'Background saving scheduled');
+      expect(executor.lastCommand, ['BGSAVE', 'SCHEDULE']);
+
+      executor.response = 'OK';
+      expect(await executor.save(), 'OK');
+      expect(executor.lastCommand, ['SAVE']);
+
+      executor.response = 1710000000;
+      expect(await executor.lastSave(), 1710000000);
+      expect(executor.lastCommand, ['LASTSAVE']);
+    });
+
+    test('failover builds target timeout and force options', () async {
+      final executor = _FakeAdminExecutor()..response = 'OK';
+
+      final result = await executor.failover(
+        targetHost: '127.0.0.1',
+        targetPort: 6380,
+        timeoutMs: 5000,
+        force: true,
+      );
+
+      expect(result, 'OK');
+      expect(executor.lastCommand, [
+        'FAILOVER',
+        'TO',
+        '127.0.0.1',
+        6380,
+        'FORCE',
+        'TIMEOUT',
+        5000,
+      ]);
+    });
+
+    test('failover validates abort and force constraints', () {
+      final executor = _FakeAdminExecutor();
+
+      expect(
+        () => executor.failover(targetHost: '127.0.0.1'),
+        throwsArgumentError,
+      );
+      expect(
+        () => executor.failover(force: true, timeoutMs: 1000),
+        throwsArgumentError,
+      );
+      expect(
+        () => executor.failover(abort: true, timeoutMs: 1000),
+        throwsArgumentError,
+      );
+    });
+
+    test('hotkeys helpers build commands and normalize GET', () async {
+      final executor = _FakeAdminExecutor()..response = 'OK';
+
+      expect(
+        await executor.hotKeysStart(
+          metricsCount: 2,
+          metrics: {HotKeysMetric.cpu, HotKeysMetric.net},
+          count: 5,
+          durationSeconds: 10,
+          sampleRatio: 4,
+          slots: [1, 2],
+        ),
+        'OK',
+      );
+      expect(executor.lastCommand, [
+        'HOTKEYS',
+        'START',
+        'METRICS',
+        2,
+        'CPU',
+        'NET',
+        'COUNT',
+        5,
+        'DURATION',
+        10,
+        'SAMPLE',
+        4,
+        'SLOTS',
+        2,
+        1,
+        2,
+      ]);
+
+      executor.response = [
+        'tracking-active',
+        0,
+        'by-cpu-time-us',
+        ['key-1', 5, 'key-2', 3],
+      ];
+      expect(await executor.hotKeysGet(), {
+        'tracking-active': 0,
+        'by-cpu-time-us': {'key-1': 5, 'key-2': 3},
+      });
+      expect(executor.lastCommand, ['HOTKEYS', 'GET']);
+
+      executor.response = 'OK';
+      expect(await executor.hotKeysStop(), 'OK');
+      expect(executor.lastCommand, ['HOTKEYS', 'STOP']);
+
+      expect(await executor.hotKeysReset(), 'OK');
+      expect(executor.lastCommand, ['HOTKEYS', 'RESET']);
+    });
+
+    test('hotkeys start requires at least one metric', () {
+      final executor = _FakeAdminExecutor();
+
+      expect(
+        () => executor.hotKeysStart(metricsCount: 1, metrics: {}),
+        throwsArgumentError,
+      );
+    });
+
+    test('lolwut builds VERSION and extra arguments', () async {
+      final executor = _FakeAdminExecutor()..response = 'art';
+
+      final result = await executor.lolWut(version: 6, arguments: [40, 20]);
+
+      expect(result, 'art');
+      expect(executor.lastCommand, ['LOLWUT', 'VERSION', 6, 40, 20]);
     });
 
     test('publish builds PUBLISH and decodes receiver count', () async {
@@ -175,6 +320,64 @@ void main() {
 
       expect(result, 1);
       expect(executor.lastCommand, ['SPUBLISH', 'orders:{1}', 'ready']);
+    });
+
+    test('replication helpers build exact low-level commands', () async {
+      final executor = _FakeAdminExecutor()..response = 'OK';
+
+      expect(await executor.replConfListeningPort(6380), 'OK');
+      expect(executor.lastCommand, ['REPLCONF', 'listening-port', 6380]);
+
+      expect(await executor.replConfAck(42), 'OK');
+      expect(executor.lastCommand, ['REPLCONF', 'ACK', 42]);
+
+      expect(await executor.replConfCapabilities(['eof', 'psync2']), 'OK');
+      expect(executor.lastCommand, [
+        'REPLCONF',
+        'capa',
+        'eof',
+        'capa',
+        'psync2',
+      ]);
+
+      executor.response = 'FULLRESYNC';
+      expect(await executor.psync('replid', -1), 'FULLRESYNC');
+      expect(executor.lastCommand, ['PSYNC', 'replid', -1]);
+
+      executor.response = 'stream';
+      expect(await executor.sync(), 'stream');
+      expect(executor.lastCommand, ['SYNC']);
+    });
+
+    test('shutdown builds flags and validates abort exclusivity', () async {
+      final executor = _FakeAdminExecutor()..response = 'OK';
+
+      final result = await executor.shutdown(
+        noSave: true,
+        now: true,
+        force: true,
+      );
+
+      expect(result, 'OK');
+      expect(executor.lastCommand, ['SHUTDOWN', 'NOSAVE', 'NOW', 'FORCE']);
+
+      expect(
+        () => executor.shutdown(save: true, noSave: true),
+        throwsArgumentError,
+      );
+      expect(
+        () => executor.shutdown(abort: true, force: true),
+        throwsArgumentError,
+      );
+    });
+
+    test('swapDb builds SWAPDB', () async {
+      final executor = _FakeAdminExecutor()..response = 'OK';
+
+      final result = await executor.swapDb(0, 1);
+
+      expect(result, 'OK');
+      expect(executor.lastCommand, ['SWAPDB', 0, 1]);
     });
 
     test('memory malloc and purge helpers build exact commands', () async {
@@ -293,11 +496,13 @@ void main() {
         'value',
       ]);
 
-      expect(await executor.aclLoad(), 'OK');
-      expect(executor.lastCommand, ['ACL', 'LOAD']);
+      final admin = _FakeAdminExecutor()..response = 'OK';
+      expect(await admin.aclLoad(), 'OK');
+      expect(admin.lastCommand, ['ACL', 'LOAD']);
 
-      expect(await executor.aclSave(), 'OK');
-      expect(executor.lastCommand, ['ACL', 'SAVE']);
+      admin.response = 'OK';
+      expect(await admin.aclSave(), 'OK');
+      expect(admin.lastCommand, ['ACL', 'SAVE']);
     });
   });
 }
