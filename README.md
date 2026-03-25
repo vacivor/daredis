@@ -102,7 +102,6 @@ import 'package:daredis/daredis.dart';
 
 Future<void> main() async {
   final cluster = DaredisCluster(
-    clientPoolSize: 4,
     options: ClusterOptions(
       seeds: const [
         ClusterNode('127.0.0.1', 7000),
@@ -385,14 +384,12 @@ Recommended production-style defaults:
 
 ## Cluster Pool Configuration
 
-Cluster uses two levels of pooling:
-
-- `clientPoolSize`: top-level cluster routing clients
-- `nodePoolSize`: per-node Redis connection pools
+Cluster keeps one connection pool per discovered Redis node.
+Routing stays inside the cluster client, so `nodePoolSize` directly controls
+the per-node concurrency budget.
 
 ```dart
 final cluster = DaredisCluster(
-  clientPoolSize: 4,
   options: ClusterOptions(
     seeds: const [
       ClusterNode('127.0.0.1', 7000),

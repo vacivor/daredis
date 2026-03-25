@@ -38,7 +38,6 @@ void main() {
           poolCreateRetryDelay: Duration(milliseconds: 40),
           poolUseLifo: true,
         ),
-        clientPoolSize: 5,
       );
 
       expect(cluster.poolStats.maxSize, 5);

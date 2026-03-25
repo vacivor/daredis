@@ -95,46 +95,19 @@ class DaredisCluster extends RedisClusterClient
         RedisClusterCommands
     implements RedisPubSubCapable {
   final ClusterOptions options;
-  final Pool<_DaredisClusterConnection> _pool;
+  final _DaredisClusterConnection _router;
   bool _connected = false;
   bool _closed = false;
 
   /// Creates a cluster client.
   DaredisCluster({
     required this.options,
-    int clientPoolSize = 4,
     bool testOnBorrow = true,
     bool testOnReturn = false,
-  }) : _pool = Pool<_DaredisClusterConnection>(
-         config: PoolConfig(
-           maxSize: clientPoolSize,
-           maxWaiters: options.poolMaxWaiters,
-           acquireTimeout: options.poolAcquireTimeout,
-           idleTimeout: options.poolIdleTimeout,
-           evictionInterval: options.poolEvictionInterval,
-           createMaxAttempts: options.poolCreateMaxAttempts,
-           createRetryDelay: options.poolCreateRetryDelay,
-           useLifo: options.poolUseLifo,
-           testOnBorrow: testOnBorrow,
-           testOnReturn: testOnReturn,
-         ),
-         create: () async {
-           final client = _DaredisClusterConnection(options);
-           await client.connect();
-           return client;
-         },
-         dispose: (client) => client.close(),
-         validate: (client) async {
-           try {
-             if (!client.isConnected) {
-               await client.connect();
-             }
-             await client.sendCommand(['PING']);
-             return true;
-           } catch (_) {
-             return false;
-           }
-         },
+  }) : _router = _DaredisClusterConnection(
+         options,
+         testOnBorrow: testOnBorrow,
+         testOnReturn: testOnReturn,
        );
 
   @override
@@ -143,18 +116,14 @@ class DaredisCluster extends RedisClusterClient
   @override
   bool get isClosed => _closed;
 
-  /// Runtime statistics for the outer client pool.
-  PoolStats get poolStats => _pool.stats;
+  /// Runtime statistics for the per-node connection pools.
+  PoolStats get poolStats => _router.poolStats;
 
   @override
   /// Warms up the client by connecting one pooled cluster session.
   Future<void> connect() async {
     if (_connected) return;
-    await _pool.withResource((client) async {
-      if (!client.isConnected) {
-        await client.connect();
-      }
-    });
+    await _router.connect();
     _connected = true;
   }
 
@@ -162,28 +131,24 @@ class DaredisCluster extends RedisClusterClient
   /// Closes the client and all underlying node pools.
   Future<void> close() async {
     _closed = true;
-    await _pool.close();
+    _connected = false;
+    await _router.close();
   }
 
   @override
   /// Sends a command through a slot-aware pooled cluster session.
   Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) {
     ensureReady();
-    return _pool.withResource((client) async {
-      if (!client.isConnected) {
-        await client.connect();
-      }
-      return client.sendCommand(command, timeout: timeout);
-    });
+    return _router.sendCommand(command, timeout: timeout);
   }
 
   /// Creates a cluster-aware pipeline helper.
   ClusterPipeline pipeline() => ClusterPipeline(
-    (commands) => _pool.withResource((client) async {
+    (commands) async {
       for (final command in commands) {
-        client.validateCommandKeys(command);
+        _router.validateCommandKeys(command);
       }
-    }),
+    },
     (command, timeout) => sendCommand(command, timeout: timeout),
   );
 
@@ -211,12 +176,7 @@ class DaredisCluster extends RedisClusterClient
   /// target the same Redis Cluster slot.
   Future<RedisClusterTransaction> openTransaction(String routingKey) {
     ensureReady();
-    return _pool.withResource((client) async {
-      if (!client.isConnected) {
-        await client.connect();
-      }
-      return client.openTransaction(routingKey);
-    });
+    return _router.openTransaction(routingKey);
   }
 }
 
@@ -288,18 +248,113 @@ class RedisClusterTransaction extends RedisTransactionSession
 
 class _DaredisClusterConnection extends RedisClusterClient {
   final ClusterOptions options;
+  final bool testOnBorrow;
+  final bool testOnReturn;
   final ClusterSlotCache _slotCache = ClusterSlotCache();
   final Map<ClusterNodeAddress, Pool<Connection>> _pools = {};
+  late final PoolConfig _nodePoolConfig;
   bool _connected = false;
   bool _closed = false;
 
-  _DaredisClusterConnection(this.options);
+  _DaredisClusterConnection(
+    this.options, {
+    required this.testOnBorrow,
+    required this.testOnReturn,
+  }) : _nodePoolConfig = PoolConfig(
+         maxSize: options.nodePoolSize,
+         maxWaiters: options.poolMaxWaiters,
+         acquireTimeout: options.poolAcquireTimeout,
+         idleTimeout: options.poolIdleTimeout,
+         evictionInterval: options.poolEvictionInterval,
+         createMaxAttempts: options.poolCreateMaxAttempts,
+         createRetryDelay: options.poolCreateRetryDelay,
+         useLifo: options.poolUseLifo,
+         testOnBorrow: testOnBorrow,
+         testOnReturn: testOnReturn,
+       );
 
   @override
   bool get isConnected => _connected;
 
   @override
   bool get isClosed => _closed;
+
+  PoolStats get poolStats {
+    if (_pools.isEmpty) {
+      return PoolStats(
+        total: 0,
+        idle: 0,
+        inUse: 0,
+        creating: 0,
+        waiters: 0,
+        maxSize: _nodePoolConfig.maxSize,
+        maxIdle: _nodePoolConfig.maxIdle,
+        minIdle: _nodePoolConfig.minIdle,
+        createdCount: 0,
+        disposedCount: 0,
+        createFailureCount: 0,
+        lastEvictionAt: null,
+        lastCreateFailureAt: null,
+        isClosed: _closed,
+      );
+    }
+
+    var total = 0;
+    var idle = 0;
+    var inUse = 0;
+    var creating = 0;
+    var waiters = 0;
+    var maxSize = 0;
+    var maxIdle = 0;
+    var minIdle = 0;
+    var createdCount = 0;
+    var disposedCount = 0;
+    var createFailureCount = 0;
+    DateTime? lastEvictionAt;
+    DateTime? lastCreateFailureAt;
+
+    for (final pool in _pools.values) {
+      final stats = pool.stats;
+      total += stats.total;
+      idle += stats.idle;
+      inUse += stats.inUse;
+      creating += stats.creating;
+      waiters += stats.waiters;
+      maxSize += stats.maxSize;
+      maxIdle += stats.maxIdle;
+      minIdle += stats.minIdle;
+      createdCount += stats.createdCount;
+      disposedCount += stats.disposedCount;
+      createFailureCount += stats.createFailureCount;
+      if (stats.lastEvictionAt != null &&
+          (lastEvictionAt == null ||
+              stats.lastEvictionAt!.isAfter(lastEvictionAt))) {
+        lastEvictionAt = stats.lastEvictionAt;
+      }
+      if (stats.lastCreateFailureAt != null &&
+          (lastCreateFailureAt == null ||
+              stats.lastCreateFailureAt!.isAfter(lastCreateFailureAt))) {
+        lastCreateFailureAt = stats.lastCreateFailureAt;
+      }
+    }
+
+    return PoolStats(
+      total: total,
+      idle: idle,
+      inUse: inUse,
+      creating: creating,
+      waiters: waiters,
+      maxSize: maxSize,
+      maxIdle: maxIdle,
+      minIdle: minIdle,
+      createdCount: createdCount,
+      disposedCount: disposedCount,
+      createFailureCount: createFailureCount,
+      lastEvictionAt: lastEvictionAt,
+      lastCreateFailureAt: lastCreateFailureAt,
+      isClosed: _closed,
+    );
+  }
 
   @override
   Future<void> connect() async {
@@ -341,6 +396,7 @@ class _DaredisClusterConnection extends RedisClusterClient {
   @override
   Future<void> close() async {
     _closed = true;
+    _connected = false;
     for (final pool in _pools.values) {
       await pool.close();
     }
@@ -423,39 +479,7 @@ class _DaredisClusterConnection extends RedisClusterClient {
 
   void _buildPoolsFromSlots() {
     for (final node in _slotCache.uniqueNodes()) {
-      _pools.putIfAbsent(node, () {
-        final opts = _optionsForAddress(node);
-        return Pool<Connection>(
-          config: PoolConfig(
-            maxSize: options.nodePoolSize,
-            maxWaiters: options.poolMaxWaiters,
-            acquireTimeout: options.poolAcquireTimeout,
-            idleTimeout: options.poolIdleTimeout,
-            evictionInterval: options.poolEvictionInterval,
-            createMaxAttempts: options.poolCreateMaxAttempts,
-            createRetryDelay: options.poolCreateRetryDelay,
-            useLifo: options.poolUseLifo,
-            testOnBorrow: true,
-            testOnReturn: false,
-          ),
-          create: () async {
-            final connection = Connection.fromOptions(opts);
-            await connection.connect();
-            return connection;
-          },
-          dispose: (connection) => connection.disconnect(),
-          validate: (connection) async {
-            try {
-              await connection.ensureConnected();
-              final res = await connection.sendCommand(['PING']);
-              final text = res?.toString();
-              return text == 'PONG' || text == 'OK';
-            } catch (_) {
-              return false;
-            }
-          },
-        );
-      });
+      _pools.putIfAbsent(node, () => _createNodePool(_optionsForAddress(node)));
     }
   }
 
@@ -475,27 +499,32 @@ class _DaredisClusterConnection extends RedisClusterClient {
   }
 
   Pool<Connection> _poolForAddress(ClusterNodeAddress address) {
-    return _pools.putIfAbsent(address, () {
-      final opts = _optionsForAddress(address);
-      return Pool<Connection>(
-        config: PoolConfig(
-          maxSize: options.nodePoolSize,
-          maxWaiters: options.poolMaxWaiters,
-          acquireTimeout: options.poolAcquireTimeout,
-          idleTimeout: options.poolIdleTimeout,
-          evictionInterval: options.poolEvictionInterval,
-          createMaxAttempts: options.poolCreateMaxAttempts,
-          createRetryDelay: options.poolCreateRetryDelay,
-          useLifo: options.poolUseLifo,
-        ),
-        create: () async {
-          final connection = Connection.fromOptions(opts);
-          await connection.connect();
-          return connection;
-        },
-        dispose: (connection) => connection.disconnect(),
-      );
-    });
+    return _pools.putIfAbsent(
+      address,
+      () => _createNodePool(_optionsForAddress(address)),
+    );
+  }
+
+  Pool<Connection> _createNodePool(ConnectionOptions options) {
+    return Pool<Connection>(
+      config: _nodePoolConfig,
+      create: () async {
+        final connection = Connection.fromOptions(options);
+        await connection.connect();
+        return connection;
+      },
+      dispose: (connection) => connection.disconnect(),
+      validate: (connection) async {
+        try {
+          await connection.ensureConnected();
+          final res = await connection.sendCommand(['PING']);
+          final text = res?.toString();
+          return text == 'PONG' || text == 'OK';
+        } catch (_) {
+          return false;
+        }
+      },
+    );
   }
 
   ConnectionOptions _optionsForAddress(ClusterNodeAddress address) {
