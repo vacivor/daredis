@@ -87,7 +87,7 @@ void main() {
       await pubsub.subscribe([channel]);
       final messageFuture = pubsub.dataMessages.first;
 
-      final receivers = await client.sendCommand(['PUBLISH', channel, 'hello']);
+      final receivers = await client.publish(channel, 'hello');
       final message = await messageFuture;
 
       expect(receivers, 1);

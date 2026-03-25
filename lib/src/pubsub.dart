@@ -13,16 +13,21 @@ import 'package:daredis/src/resp.dart';
 List<List<dynamic>> buildPubSubResubscribeCommands({
   required Iterable<String> channels,
   required Iterable<String> patterns,
+  Iterable<String> shardChannels = const [],
 }) {
   final commands = <List<dynamic>>[];
   final channelList = channels.toList(growable: false);
   final patternList = patterns.toList(growable: false);
+  final shardChannelList = shardChannels.toList(growable: false);
 
   if (channelList.isNotEmpty) {
     commands.add(['SUBSCRIBE', ...channelList]);
   }
   if (patternList.isNotEmpty) {
     commands.add(['PSUBSCRIBE', ...patternList]);
+  }
+  if (shardChannelList.isNotEmpty) {
+    commands.add(['SSUBSCRIBE', ...shardChannelList]);
   }
 
   return commands;
@@ -67,6 +72,7 @@ class RedisPubSub {
   final Queue<_PubSubAckWaiter> _ackQueue = Queue();
   final Set<String> _channels = {};
   final Set<String> _patterns = {};
+  final Set<String> _shardChannels = {};
 
   RedisPubSub({
     required this.host,
@@ -119,9 +125,7 @@ class RedisPubSub {
     Stream<PubSubMessage> stream = messages;
 
     if (ignoreSubscriptionMessages) {
-      stream = stream.where(
-        (message) => message.type == 'message' || message.type == 'pmessage',
-      );
+      stream = stream.where((message) => message.isDataMessage);
     }
 
     if (timeout == null) {
@@ -279,10 +283,18 @@ class RedisPubSub {
       );
       return;
     }
+    if (type == 'smessage') {
+      _addMessage(
+        PubSubMessage(type, channel: frame[1].toString(), payload: frame[2]),
+      );
+      return;
+    }
     if (type == 'subscribe' ||
         type == 'psubscribe' ||
+        type == 'ssubscribe' ||
         type == 'unsubscribe' ||
-        type == 'punsubscribe') {
+        type == 'punsubscribe' ||
+        type == 'sunsubscribe') {
       final count = frame.length > 2 ? _parseInt(frame[2]) : null;
       _addMessage(
         PubSubMessage(
@@ -361,6 +373,26 @@ class RedisPubSub {
     );
   }
 
+  /// Subscribes to one or more shard channels.
+  Future<void> ssubscribe(List<String> shardChannels) async {
+    if (shardChannels.isEmpty) return;
+    _ensureOpen();
+    await ensureConnected();
+    _shardChannels.addAll(shardChannels);
+    final waiter = _PubSubAckWaiter(
+      types: const {'ssubscribe'},
+      remaining: shardChannels.length,
+    );
+    _ackQueue.add(waiter);
+    await _sendCommand(['SSUBSCRIBE', ...shardChannels]);
+    await waiter.completer.future.timeout(
+      commandTimeout,
+      onTimeout: () => throw DaredisTimeoutException(
+        'SSubscribe timed out after ${commandTimeout.inSeconds}s',
+      ),
+    );
+  }
+
   /// Unsubscribes from specific channels, or from all channels when omitted.
   Future<void> unsubscribe([List<String> channels = const []]) async {
     _ensureOpen();
@@ -407,6 +439,29 @@ class RedisPubSub {
     );
   }
 
+  /// Unsubscribes from specific shard channels, or from all shard channels when omitted.
+  Future<void> sunsubscribe([List<String> shardChannels = const []]) async {
+    _ensureOpen();
+    await ensureConnected();
+    if (shardChannels.isEmpty) {
+      _shardChannels.clear();
+    } else {
+      _shardChannels.removeAll(shardChannels);
+    }
+    final waiter = _PubSubAckWaiter(
+      types: const {'sunsubscribe'},
+      remaining: shardChannels.isEmpty ? 1 : shardChannels.length,
+    );
+    _ackQueue.add(waiter);
+    await _sendCommand(['SUNSUBSCRIBE', ...shardChannels]);
+    await waiter.completer.future.timeout(
+      commandTimeout,
+      onTimeout: () => throw DaredisTimeoutException(
+        'SUnsubscribe timed out after ${commandTimeout.inSeconds}s',
+      ),
+    );
+  }
+
   /// Closes the socket without clearing the closed state.
   Future<void> disconnect() async {
     _shouldReconnect = false;
@@ -427,6 +482,7 @@ class RedisPubSub {
     _closed = true;
     _channels.clear();
     _patterns.clear();
+    _shardChannels.clear();
     await disconnect();
     if (!_pubSubController.isClosed) {
       await _pubSubController.close();
@@ -479,22 +535,21 @@ class RedisPubSub {
     final commands = buildPubSubResubscribeCommands(
       channels: _channels,
       patterns: _patterns,
+      shardChannels: _shardChannels,
     );
 
     for (final command in commands) {
-      if (command.first == 'SUBSCRIBE') {
-        final waiter = _PubSubAckWaiter(
-          types: const {'subscribe'},
-          remaining: command.length - 1,
-        );
-        _ackQueue.add(waiter);
-        await _sendCommand(command);
-        await waiter.completer.future.timeout(commandTimeout);
-        continue;
-      }
-
+      final commandName = command.first.toString().toUpperCase();
+      final ackType = switch (commandName) {
+        'SUBSCRIBE' => 'subscribe',
+        'PSUBSCRIBE' => 'psubscribe',
+        'SSUBSCRIBE' => 'ssubscribe',
+        _ => throw DaredisProtocolException(
+          'Unsupported pubsub resubscribe command: $commandName',
+        ),
+      };
       final waiter = _PubSubAckWaiter(
-        types: const {'psubscribe'},
+        types: {ackType},
         remaining: command.length - 1,
       );
       _ackQueue.add(waiter);

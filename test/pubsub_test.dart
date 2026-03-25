@@ -65,6 +65,31 @@ void main() {
       expect(message.payload, 'hello');
     });
 
+    test('handleFrame supports shard messages and shard subscription events', () async {
+      final pubsub = RedisPubSub(host: '127.0.0.1', port: 6379);
+
+      final subscriptionFuture = pubsub.subscriptionEvents.firstWhere(
+        (message) => message.type == 'ssubscribe',
+      );
+      final dataFuture = pubsub.dataMessages.firstWhere(
+        (message) => message.type == 'smessage',
+      );
+
+      pubsub.handleFrame(['ssubscribe', 'orders:{1}', 1]);
+      pubsub.handleFrame(['smessage', 'orders:{1}', 'ready']);
+
+      final subscription = await subscriptionFuture;
+      final data = await dataFuture;
+
+      expect(subscription.channel, 'orders:{1}');
+      expect(subscription.subscriptionCount, 1);
+      expect(subscription.isSubscriptionEvent, isTrue);
+
+      expect(data.channel, 'orders:{1}');
+      expect(data.payload, 'ready');
+      expect(data.isDataMessage, isTrue);
+    });
+
     test('close closes the message stream', () async {
       final pubsub = RedisPubSub(host: '127.0.0.1', port: 6379);
 

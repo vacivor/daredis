@@ -13,11 +13,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 326
+- Ready: 328
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 105
+- Raw only: 103
 
 ## String commands
 
@@ -329,14 +329,14 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `PSUBSCRIBE` | Yes | No | Helper only | Pub/Sub session only |
-| `PUBLISH` | No | No | Raw only | Raw only |
+| `PUBLISH` | Yes | Yes | Ready | Posts a message to a pub/sub channel and returns the receiver count. |
 | `PUBSUB CHANNELS` | Yes | Yes | Ready | Returns the active channels. |
 | `PUBSUB NUMPAT` | Yes | Yes | Ready | Returns a count of unique pattern subscriptions. |
 | `PUBSUB NUMSUB` | Yes | Yes | Ready | Returns a count of subscribers to channels. |
 | `PUBSUB SHARDCHANNELS` | Yes | Yes | Ready | Returns the active shard channels. |
 | `PUBSUB SHARDNUMSUB` | Yes | Yes | Ready | Returns the count of subscribers of shard channels. |
 | `PUNSUBSCRIBE` | Yes | No | Helper only | Pub/Sub session only |
-| `SPUBLISH` | No | No | Raw only | Raw only |
+| `SPUBLISH` | Yes | Yes | Ready | Posts a message to a shard pub/sub channel and returns the receiver count. |
 | `SSUBSCRIBE` | Yes | No | Helper only | Pub/Sub session only |
 | `SUBSCRIBE` | Yes | No | Helper only | Pub/Sub session only |
 | `SUNSUBSCRIBE` | Yes | No | Helper only | Pub/Sub session only |

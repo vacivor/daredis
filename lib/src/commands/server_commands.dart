@@ -889,6 +889,11 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return Decoders.toInt(res);
   }
 
+  Future<int> publish(String channel, dynamic message) async {
+    final res = await sendCommand(['PUBLISH', channel, message]);
+    return Decoders.toInt(res);
+  }
+
   Future<List<String>> pubSubShardChannels([String? pattern]) async {
     final args = ['PUBSUB', 'SHARDCHANNELS'];
     if (pattern != null) args.add(pattern);
@@ -907,6 +912,11 @@ mixin RedisServerCommands on RedisCommandExecutor {
       return map;
     }
     return {};
+  }
+
+  Future<int> spublish(String shardChannel, dynamic message) async {
+    final res = await sendCommand(['SPUBLISH', shardChannel, message]);
+    return Decoders.toInt(res);
   }
 
   Future<dynamic> functionLoad(String code, {bool replace = false}) {

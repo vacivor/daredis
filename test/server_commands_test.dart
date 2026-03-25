@@ -159,6 +159,24 @@ void main() {
       expect(executor.lastCommand, ['MODULE', 'UNLOAD', 'search']);
     });
 
+    test('publish builds PUBLISH and decodes receiver count', () async {
+      final executor = _FakeServerExecutor()..response = 2;
+
+      final result = await executor.publish('news', 'hello');
+
+      expect(result, 2);
+      expect(executor.lastCommand, ['PUBLISH', 'news', 'hello']);
+    });
+
+    test('spublish builds SPUBLISH and decodes receiver count', () async {
+      final executor = _FakeServerExecutor()..response = 1;
+
+      final result = await executor.spublish('orders:{1}', 'ready');
+
+      expect(result, 1);
+      expect(executor.lastCommand, ['SPUBLISH', 'orders:{1}', 'ready']);
+    });
+
     test('memory malloc and purge helpers build exact commands', () async {
       final executor = _FakeServerExecutor()..response = 'jemalloc stats';
 

@@ -102,6 +102,8 @@ class ClusterCommandSpec {
     'MODULE': noKey,
     'FUNCTION': noKey,
     'PUBSUB': noKey,
+    'PUBLISH': noKey,
+    'SPUBLISH': CommandSpec.singleKeyAt(1),
     'MONITOR': noKey,
     'ASKING': noKey,
     'MEMORY': CommandSpec.memorySubcommand(),

@@ -7,11 +7,13 @@ void main() {
       final commands = buildPubSubResubscribeCommands(
         channels: const ['news', 'alerts'],
         patterns: const ['news.*'],
+        shardChannels: const ['news:{1}'],
       );
 
       expect(commands, [
         ['SUBSCRIBE', 'news', 'alerts'],
         ['PSUBSCRIBE', 'news.*'],
+        ['SSUBSCRIBE', 'news:{1}'],
       ]);
     });
 

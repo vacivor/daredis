@@ -28,11 +28,14 @@ class PubSubMessage {
   bool get isSubscriptionEvent =>
       type == 'subscribe' ||
       type == 'psubscribe' ||
+      type == 'ssubscribe' ||
       type == 'unsubscribe' ||
-      type == 'punsubscribe';
+      type == 'punsubscribe' ||
+      type == 'sunsubscribe';
 
   /// Whether this frame carries published application data.
-  bool get isDataMessage => type == 'message' || type == 'pmessage';
+  bool get isDataMessage =>
+      type == 'message' || type == 'pmessage' || type == 'smessage';
 
   @override
   String toString() =>
