@@ -92,6 +92,7 @@ class Daredis extends RedisClient
   /// Closes the client and disposes the underlying connection pool.
   Future<void> close() async {
     _closed = true;
+    _connected = false;
     await _pool.close();
   }
 

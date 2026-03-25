@@ -2,7 +2,6 @@ import 'package:daredis/daredis.dart';
 
 Future<void> main() async {
   final cluster = DaredisCluster(
-    clientPoolSize: 4,
     options: ClusterOptions(
       seeds: const [
         ClusterNode('127.0.0.1', 7000),

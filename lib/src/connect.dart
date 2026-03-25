@@ -58,8 +58,10 @@ class Connection {
   final _buffer = BytesBuilder();
   bool _isReconnecting = false;
   int _reconnectAttempts = 0;
+  bool _shouldReconnect = true;
 
   Socket? _socket;
+  StreamSubscription<Uint8List>? _socketSubscription;
 
   Connection({
     required this.host,
@@ -90,17 +92,20 @@ class Connection {
 
   /// Opens the socket and authenticates when credentials are configured.
   Future<void> connect() async {
+    if (_socket != null) {
+      return;
+    }
+    _shouldReconnect = true;
     try {
-      if (useSsl) {
-        _socket = await SecureSocket.connect(
-          host,
-          port,
-          timeout: connectTimeout,
-        );
-      } else {
-        _socket = await Socket.connect(host, port, timeout: connectTimeout);
-      }
-      _socket!.listen(_onData, onError: _onError, onDone: _onDone);
+      final socket = useSsl
+          ? await SecureSocket.connect(host, port, timeout: connectTimeout)
+          : await Socket.connect(host, port, timeout: connectTimeout);
+      _socket = socket;
+      _socketSubscription = socket.listen(
+        _onData,
+        onError: _onError,
+        onDone: _onDone,
+      );
 
       if (password != null) {
         if (username != null) {
@@ -110,7 +115,11 @@ class Connection {
         }
       }
       _reconnectAttempts = 0;
+    } on DaredisException {
+      await _disposeSocket(graceful: true);
+      rethrow;
     } catch (e) {
+      await _disposeSocket(graceful: true);
       if (!_isReconnecting) {
         throw DaredisNetworkException('Failed to connect to $host:$port: $e');
       }
@@ -134,26 +143,51 @@ class Connection {
 
   void _onError(Object error) {
     _cleanup(error);
-    _handleReconnect();
+    unawaited(_handleReconnect());
   }
 
   void _onDone() {
     _cleanup(null);
-    _handleReconnect();
+    unawaited(_handleReconnect());
   }
 
-  void _cleanup(dynamic error) {
-    final e = error is DaredisException
+  void _completePending(dynamic error) {
+    final exception = error is DaredisException
         ? error
         : DaredisNetworkException(
             error == null ? 'Connection closed' : 'Connection error: $error',
           );
-    for (var completer in _completers) {
-      completer.completeError(e);
+    for (final completer in _completers) {
+      completer.completeError(exception);
     }
     _completers.clear();
-    _socket?.destroy();
+  }
+
+  void _cleanup(dynamic error) {
+    _completePending(error);
+    final subscription = _socketSubscription;
+    final socket = _socket;
+    _socketSubscription = null;
     _socket = null;
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
+    socket?.destroy();
+  }
+
+  Future<void> _disposeSocket({required bool graceful}) async {
+    final subscription = _socketSubscription;
+    final socket = _socket;
+    _socketSubscription = null;
+    _socket = null;
+    if (subscription != null) {
+      await subscription.cancel();
+    }
+    if (graceful) {
+      await socket?.close();
+    } else {
+      socket?.destroy();
+    }
   }
 
   void _tryDecode() {
@@ -193,12 +227,15 @@ class Connection {
 
   /// Closes the socket without attempting to reconnect.
   Future<void> disconnect() async {
-    await _socket?.close();
-    _socket = null;
+    _shouldReconnect = false;
+    _isReconnecting = false;
+    _reconnectAttempts = 0;
+    _completePending(DaredisConnectionException('Connection closed'));
+    await _disposeSocket(graceful: true);
   }
 
   Future<void> _handleReconnect() async {
-    if (_isReconnecting) return;
+    if (!_shouldReconnect || _isReconnecting) return;
     if (reconnectPolicy.maxAttempts != null &&
         _reconnectAttempts >= reconnectPolicy.maxAttempts!) {
       return;
@@ -206,12 +243,18 @@ class Connection {
     _isReconnecting = true;
     _reconnectAttempts += 1;
     await Future.delayed(reconnectPolicy.delay);
+    if (!_shouldReconnect) {
+      _isReconnecting = false;
+      return;
+    }
     try {
       await connect();
       _isReconnecting = false;
-    } catch (e) {
+    } on DaredisCommandException {
       _isReconnecting = false;
-      _handleReconnect();
+    } catch (_) {
+      _isReconnecting = false;
+      unawaited(_handleReconnect());
     }
   }
 
