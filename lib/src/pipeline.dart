@@ -1,9 +1,8 @@
 import 'exceptions.dart';
 
-/// Simple client-side pipeline that batches commands and awaits all results.
+/// Batches commands on a single connection and awaits all results in order.
 class RedisPipeline {
-  final Future<dynamic> Function(List<dynamic> command, Duration? timeout)
-  _sender;
+  final Future<List<dynamic>> Function(List<PipelineItem> items) _sender;
   final List<PipelineItem> _items = [];
   bool _executed = false;
 
@@ -24,8 +23,7 @@ class RedisPipeline {
       throw DaredisStateException('Pipeline already executed');
     }
     _executed = true;
-    final futures = _items.map((item) => _sender(item.command, item.timeout));
-    final batch = Future.wait(futures);
+    final batch = _sender(List<PipelineItem>.unmodifiable(_items));
     if (timeout == null) {
       return await batch;
     }

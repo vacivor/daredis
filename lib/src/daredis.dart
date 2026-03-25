@@ -107,9 +107,16 @@ class Daredis extends RedisClient
   }
 
   /// Creates a pipeline helper that executes through this client.
-  RedisPipeline pipeline() => RedisPipeline(
-    (command, timeout) => sendCommand(command, timeout: timeout),
-  );
+  RedisPipeline pipeline() => RedisPipeline((items) {
+    return _pool.withResource((connection) async {
+      await connection.ensureConnected();
+      final futures = [
+        for (final item in items)
+          connection.sendCommand(item.command, timeout: item.timeout),
+      ];
+      return Future.wait(futures);
+    });
+  });
 
   @override
   /// Opens a dedicated pub/sub session using the client's connection options.

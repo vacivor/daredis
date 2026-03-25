@@ -238,7 +238,11 @@ print(await client.sMembers('tags'));
 
 ### Pipeline
 
-Use a pipeline when you want to batch commands and collect results together.
+Use a pipeline when you want to batch commands on one connection and collect
+their replies in order.
+
+On Redis Cluster, all keyed commands in one pipeline must route to the same
+node. Use hash tags when related keys need to stay together.
 
 ```dart
 final pipeline = client.pipeline();

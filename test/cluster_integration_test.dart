@@ -1,8 +1,21 @@
 import 'package:daredis/daredis.dart';
 import 'package:daredis/src/exceptions.dart';
+import 'package:daredis/src/cluster_slots.dart';
 import 'package:test/test.dart';
 
 import 'test_helpers.dart';
+
+String _keyForSlotRange(String prefix, ClusterSlotRange range) {
+  final slotCache = ClusterSlotCache();
+  for (var attempt = 0; attempt < 200000; attempt++) {
+    final key = '$prefix:$attempt';
+    final slot = slotCache.slotForKey(key);
+    if (slot >= range.start && slot <= range.end) {
+      return key;
+    }
+  }
+  throw StateError('Unable to find a key for slot range ${range.start}-${range.end}');
+}
 
 void main() {
   group('Cluster integration', () {
@@ -236,6 +249,46 @@ void main() {
       expect(
         () => pipeline.execute(),
         throwsA(isA<RespException>()),
+      );
+    });
+
+    test('pipeline rejects commands that target different cluster nodes', timeout: integrationTestTimeout, () async {
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
+      }
+
+      final ranges = await cluster.clusterSlotRanges();
+      if (ranges.isEmpty) {
+        markTestSkipped('Cluster slot ranges are unavailable');
+        return;
+      }
+
+      final firstRange = ranges.first;
+      ClusterSlotRange? secondRange;
+      for (final range in ranges.skip(1)) {
+        if (range.primary != firstRange.primary) {
+          secondRange = range;
+          break;
+        }
+      }
+      if (secondRange == null) {
+        markTestSkipped('Cluster does not expose multiple primary nodes');
+        return;
+      }
+
+      final keyA = _keyForSlotRange(testKey('cluster-pipeline-node-a'), firstRange);
+      final keyB = _keyForSlotRange(testKey('cluster-pipeline-node-b'), secondRange);
+
+      final pipeline = cluster.pipeline();
+      pipeline.add(['GET', keyA]);
+      pipeline.add(['GET', keyB]);
+
+      await expectLater(
+        pipeline.execute(),
+        throwsA(isA<DaredisClusterException>()),
       );
     });
 
