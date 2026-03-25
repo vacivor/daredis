@@ -206,13 +206,12 @@ class RedisClusterTransaction extends RedisTransactionSession
 
   @override
   Future<void> connect() async {
-    if (_closed) {
-      _closed = false;
-    }
+    _ensureOpen();
     await _connection.connect();
   }
 
   @override
+  /// Permanently closes the pinned cluster transaction connection.
   Future<void> close() async {
     _closed = true;
     await _connection.disconnect();
@@ -237,6 +236,12 @@ class RedisClusterTransaction extends RedisTransactionSession
         );
       }
       rethrow;
+    }
+  }
+
+  void _ensureOpen() {
+    if (_closed) {
+      throw DaredisStateException('Redis cluster transaction session is closed');
     }
   }
 }

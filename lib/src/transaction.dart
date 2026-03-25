@@ -1,4 +1,5 @@
 import '../daredis.dart';
+import 'exceptions.dart';
 
 /// Dedicated Redis transaction session bound to a single connection.
 ///
@@ -37,14 +38,12 @@ class RedisTransaction extends RedisTransactionSession
   @override
   /// Opens the underlying pinned connection.
   Future<void> connect() async {
-    if (_closed) {
-      _closed = false;
-    }
+    _ensureOpen();
     await _connection.connect();
   }
 
   @override
-  /// Closes the pinned transaction connection.
+  /// Permanently closes the pinned transaction connection.
   Future<void> close() async {
     _closed = true;
     await _connection.disconnect();
@@ -56,5 +55,11 @@ class RedisTransaction extends RedisTransactionSession
     ensureReady();
     await _connection.ensureConnected();
     return _connection.sendCommand(command, timeout: timeout);
+  }
+
+  void _ensureOpen() {
+    if (_closed) {
+      throw DaredisStateException('Redis transaction session is closed');
+    }
   }
 }

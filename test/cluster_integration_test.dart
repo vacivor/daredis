@@ -348,6 +348,25 @@ void main() {
       expect(await cluster.get(actualKey), 'value');
     });
 
+    test('closed cluster transaction sessions cannot be reopened', timeout: integrationTestTimeout, () async {
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
+      }
+
+      final key = 'daredis:test:cluster:tx:closed:{${testKey('cluster-tx-closed')}}';
+      final tx = await cluster.openTransaction(key);
+
+      await tx.close();
+
+      await expectLater(
+        tx.connect(),
+        throwsA(isA<DaredisStateException>()),
+      );
+    });
+
     test('geo hyperloglog and scripting commands work in one slot', timeout: integrationTestTimeout, () async {
       if (skipIfUnavailable(
         available,
