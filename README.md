@@ -57,6 +57,9 @@ Run one with:
 dart run example/single_node.dart
 ```
 
+Command coverage tracking lives in
+[`COMMAND_ADAPTATION_PROGRESS.md`](COMMAND_ADAPTATION_PROGRESS.md).
+
 ## Quick Start
 
 ### Single Node
