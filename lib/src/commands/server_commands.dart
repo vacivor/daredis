@@ -759,6 +759,16 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return Decoders.string(res);
   }
 
+  Future<String> memoryMallocStats() async {
+    final res = await sendCommand(['MEMORY', 'MALLOC-STATS']);
+    return Decoders.string(res);
+  }
+
+  Future<String> memoryPurge() async {
+    final res = await sendCommand(['MEMORY', 'PURGE']);
+    return Decoders.string(res);
+  }
+
   Future<Map<String, dynamic>> memoryStats() async {
     final res = await sendCommand(['MEMORY', 'STATS']);
     return _serverReplyAsMap(res);
@@ -973,6 +983,23 @@ mixin RedisServerCommands on RedisCommandExecutor {
     return [];
   }
 
+  Future<List<String>> aclCat([String? category]) async {
+    final args = <dynamic>['ACL', 'CAT'];
+    if (category != null) args.add(category);
+    final res = await sendCommand(args);
+    if (res is List) return res.map((e) => e.toString()).toList();
+    return [];
+  }
+
+  Future<String> aclDryRun(
+    String username,
+    String command, [
+    List<String> args = const [],
+  ]) async {
+    final res = await sendCommand(['ACL', 'DRYRUN', username, command, ...args]);
+    return Decoders.string(res);
+  }
+
   Future<Map<String, dynamic>> aclGetUser(String username) async {
     final res = await sendCommand(['ACL', 'GETUSER', username]);
     return _serverReplyAsMap(res);
@@ -994,6 +1021,16 @@ mixin RedisServerCommands on RedisCommandExecutor {
 
   Future<String> aclWhoAmI() async {
     final res = await sendCommand(['ACL', 'WHOAMI']);
+    return Decoders.string(res);
+  }
+
+  Future<String> aclLoad() async {
+    final res = await sendCommand(['ACL', 'LOAD']);
+    return Decoders.string(res);
+  }
+
+  Future<String> aclSave() async {
+    final res = await sendCommand(['ACL', 'SAVE']);
     return Decoders.string(res);
   }
 

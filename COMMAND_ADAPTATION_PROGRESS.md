@@ -13,8 +13,8 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 284
-- Partial: 22
+- Ready: 306
+- Partial: 0
 - Helper only: 14
 - Raw + routed: 0
 - Raw only: 125
@@ -405,15 +405,15 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `ACL CAT` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `ACL CAT` | Yes | Yes | Ready | Lists ACL categories or the commands inside one category. |
 | `ACL DELUSER` | Yes | Yes | Ready | Deletes ACL users, and terminates their connections. |
-| `ACL DRYRUN` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `ACL DRYRUN` | Yes | Yes | Ready | Simulates whether a user may execute a command. |
 | `ACL GENPASS` | Yes | Yes | Ready | Generates a pseudorandom, secure password that can be used to identify ACL users. |
 | `ACL GETUSER` | Yes | Yes | Ready | Lists the ACL rules of a user. |
 | `ACL LIST` | Yes | Yes | Ready | Dumps the effective rules in ACL file format. |
-| `ACL LOAD` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `ACL LOAD` | Yes | Yes | Ready | Reloads ACL rules from the ACL file. |
 | `ACL LOG` | Yes | Yes | Ready | Lists recent security events generated due to ACL rules. |
-| `ACL SAVE` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `ACL SAVE` | Yes | Yes | Ready | Saves ACL rules to the ACL file. |
 | `ACL SETUSER` | Yes | Yes | Ready | Creates and modifies an ACL user and its rules. |
 | `ACL USERS` | Yes | Yes | Ready | Lists all ACL users. |
 | `ACL WHOAMI` | Yes | Yes | Ready | Returns the authenticated username of the current connection. |
@@ -449,8 +449,8 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `LATENCY RESET` | Yes | Family | Ready | Resets latency samples for one or more events. |
 | `LOLWUT` | No | No | Raw only | Raw only |
 | `MEMORY DOCTOR` | Yes | Yes | Ready | Outputs a memory problems report. |
-| `MEMORY MALLOC-STATS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `MEMORY PURGE` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `MEMORY MALLOC-STATS` | Yes | Yes | Ready | Returns allocator statistics as a raw report string. |
+| `MEMORY PURGE` | Yes | Yes | Ready | Asks the allocator to release memory. |
 | `MEMORY STATS` | Yes | Yes | Ready | Returns details about memory usage. |
 | `MEMORY USAGE` | Yes | Yes | Ready | Estimates the memory usage of a key. |
 | `MODULE LIST` | Yes | Family | Ready | Returns the loaded modules as normalized maps. |
@@ -478,33 +478,33 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | --- | --- | --- | --- | --- |
 | `ASKING` | Yes | Yes | Ready | Enables an importing cluster node to accept the next command. |
 | `CLUSTER ADDSLOTS` | Yes | Yes | Ready | Assigns new hash slots to a node. |
-| `CLUSTER ADDSLOTSRANGE` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER BUMPEPOCH` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER COUNT-FAILURE-REPORTS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `CLUSTER ADDSLOTSRANGE` | Yes | Yes | Ready | Assigns one or more slot ranges to a node. |
+| `CLUSTER BUMPEPOCH` | Yes | Yes | Ready | Advances the cluster config epoch. |
+| `CLUSTER COUNT-FAILURE-REPORTS` | Yes | Yes | Ready | Returns the number of failure reports for a node. |
 | `CLUSTER COUNTKEYSINSLOT` | Yes | Yes | Ready | Returns the number of keys in a hash slot. |
 | `CLUSTER DELSLOTS` | Yes | Yes | Ready | Sets hash slots as unbound for a node. |
-| `CLUSTER DELSLOTSRANGE` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER FAILOVER` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER FLUSHSLOTS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `CLUSTER DELSLOTSRANGE` | Yes | Yes | Ready | Removes one or more slot ranges from a node. |
+| `CLUSTER FAILOVER` | Yes | Yes | Ready | Forces a replica to perform a manual failover. |
+| `CLUSTER FLUSHSLOTS` | Yes | Yes | Ready | Removes all slot assignments from a node. |
 | `CLUSTER FORGET` | Yes | Yes | Ready | Removes a node from the nodes table. |
 | `CLUSTER GETKEYSINSLOT` | Yes | Yes | Ready | Returns the key names in a hash slot. |
 | `CLUSTER INFO` | Yes | Yes | Ready | Returns information about the state of a node. |
 | `CLUSTER KEYSLOT` | Yes | Yes | Ready | Returns the hash slot for a key. |
-| `CLUSTER LINKS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `CLUSTER LINKS` | Yes | Yes | Ready | Returns normalized maps describing all cluster TCP links. |
 | `CLUSTER MEET` | Yes | Yes | Ready | Forces a node to handshake with another node. |
-| `CLUSTER MIGRATION` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `CLUSTER MIGRATION` | Yes | Yes | Ready | Starts, inspects, and cancels migration tasks through explicit subcommand helpers. |
 | `CLUSTER MYID` | Yes | Yes | Ready | Returns the ID of a node. |
-| `CLUSTER MYSHARDID` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `CLUSTER MYSHARDID` | Yes | Yes | Ready | Returns the shard ID of the current node. |
 | `CLUSTER NODES` | Yes | Yes | Ready | Returns the cluster configuration for a node. |
-| `CLUSTER REPLICAS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `CLUSTER REPLICAS` | Yes | Yes | Ready | Lists the replica nodes of a master node. |
 | `CLUSTER REPLICATE` | Yes | Yes | Ready | Configure a node as replica of a master node. |
 | `CLUSTER RESET` | Yes | Yes | Ready | Resets a node. |
-| `CLUSTER SAVECONFIG` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER SET-CONFIG-EPOCH` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER SETSLOT` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER SHARDS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER SLAVES` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
-| `CLUSTER SLOT-STATS` | Family | Yes | Partial | Helper exists in command family; exact command helper may be indirect |
+| `CLUSTER SAVECONFIG` | Yes | Yes | Ready | Forces the node to persist the cluster configuration. |
+| `CLUSTER SET-CONFIG-EPOCH` | Yes | Yes | Ready | Sets the local config epoch on a node. |
+| `CLUSTER SETSLOT` | Yes | Yes | Ready | Changes the owner or transition state of a slot. |
+| `CLUSTER SHARDS` | Yes | Yes | Ready | Returns normalized shard descriptions and slot ranges. |
+| `CLUSTER SLAVES` | Yes | Yes | Ready | Deprecated alias of CLUSTER REPLICAS. |
+| `CLUSTER SLOT-STATS` | Yes | Yes | Ready | Returns normalized slot statistics for range and order-by queries. |
 | `CLUSTER SLOTS` | Yes | Yes | Ready | Returns the mapping of cluster slots to nodes. |
 | `READONLY` | Yes | Yes | Ready | Enables read-only queries for a connection to a Redis Cluster replica node. |
 | `READWRITE` | Yes | Yes | Ready | Enables read-write queries for a connection to a Reids Cluster replica node. |
