@@ -1,6 +1,8 @@
-/// Support for doing something awesome.
+/// Redis client APIs for standalone and cluster deployments.
 ///
-/// More dartdocs go here.
+/// `package:daredis` exports pooled single-node and cluster clients, dedicated
+/// pub/sub and transaction sessions, connection and pool configuration types,
+/// and typed command helpers layered on top of raw Redis replies.
 library;
 
 import 'package:daredis/src/command_executor.dart';
