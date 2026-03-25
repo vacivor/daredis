@@ -13,11 +13,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 323
+- Ready: 326
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 108
+- Raw only: 105
 
 ## String commands
 
@@ -171,13 +171,13 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `XACK` | Yes | Yes | Ready | Returns the number of messages that were successfully acknowledged by the consumer group member of a stream. |
-| `XACKDEL` | No | No | Raw only | Raw only |
+| `XACKDEL` | Yes | Yes | Ready | Acknowledges messages for a consumer group and applies stream deletion reference policies in the same command. |
 | `XADD` | Yes | Yes | Ready | Appends a new message to a stream. Creates the key if it doesn't exist. |
 | `XAUTOCLAIM` | Yes | Yes | Ready | Changes, or acquires, ownership of messages in a consumer group, as if the messages were delivered to as consumer group member. |
-| `XCFGSET` | No | No | Raw only | Raw only |
+| `XCFGSET` | Yes | Yes | Ready | Configures stream IDMP retention and capacity settings. |
 | `XCLAIM` | Yes | Yes | Ready | Changes, or acquires, ownership of a message in a consumer group, as if the message was delivered a consumer group member. |
 | `XDEL` | Yes | Yes | Ready | Returns the number of messages after removing them from a stream. |
-| `XDELEX` | No | No | Raw only | Raw only |
+| `XDELEX` | Yes | Yes | Ready | Deletes stream entries with explicit consumer-reference handling policies. |
 | `XGROUP CREATE` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
 | `XGROUP CREATECONSUMER` | Yes | Family | Ready | Typed helper with family-level cluster routing support |
 | `XGROUP DELCONSUMER` | Yes | Family | Ready | Typed helper with family-level cluster routing support |

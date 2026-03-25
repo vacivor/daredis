@@ -67,6 +67,16 @@ class StreamConsumerInfo {
   }
 }
 
+enum StreamDeletionPolicy {
+  keepRef('KEEPREF'),
+  delRef('DELREF'),
+  acked('ACKED');
+
+  final String token;
+
+  const StreamDeletionPolicy(this.token);
+}
+
 class StreamInfo {
   final int length;
   final int? radixTreeKeys;
@@ -125,6 +135,25 @@ Map<String, dynamic> _streamReplyAsMap(dynamic value) {
     return map;
   }
   throw DaredisProtocolException('Unexpected stream reply: $value');
+}
+
+List<int> _streamReplyAsIntList(dynamic value) {
+  if (value is! List) {
+    throw DaredisProtocolException('Unexpected stream integer list reply: $value');
+  }
+  return value.map(Decoders.toInt).toList();
+}
+
+void _appendStreamDeletionIds(
+  List<dynamic> args,
+  List<String> ids,
+  StreamDeletionPolicy policy,
+) {
+  if (ids.isEmpty) {
+    throw ArgumentError.value(ids, 'ids', 'must not be empty');
+  }
+  args.add(policy.token);
+  args.addAll(['IDS', ids.length, ...ids]);
 }
 
 mixin RedisStreamCommands on RedisCommandExecutor {
@@ -393,6 +422,23 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     return Decoders.string(res);
   }
 
+  Future<String> xCfgSet(
+    String key, {
+    int? idmpDuration,
+    int? idmpMaxSize,
+  }) async {
+    final args = <dynamic>['XCFGSET', key];
+    if (idmpDuration != null) args.addAll(['IDMP-DURATION', idmpDuration]);
+    if (idmpMaxSize != null) args.addAll(['IDMP-MAXSIZE', idmpMaxSize]);
+    if (args.length == 2) {
+      throw ArgumentError(
+        'At least one of idmpDuration or idmpMaxSize must be provided.',
+      );
+    }
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
   Future<dynamic> xInfoStream(String key, {bool full = false, int? count}) {
     final args = <dynamic>['STREAM', key];
     if (full) {
@@ -438,12 +484,27 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     return [];
   }
 
-  Future<int> xDelEx(String key, List<String> ids) async {
-    throw DaredisUnsupportedException('XDELEX is not a Redis command.');
+  Future<List<int>> xDelEx(
+    String key,
+    List<String> ids, {
+    StreamDeletionPolicy policy = StreamDeletionPolicy.keepRef,
+  }) async {
+    final args = <dynamic>['XDELEX', key];
+    _appendStreamDeletionIds(args, ids, policy);
+    final res = await sendCommand(args);
+    return _streamReplyAsIntList(res);
   }
 
-  Future<int> xAckDel(String key, String group, List<String> ids) async {
-    throw DaredisUnsupportedException('XACKDEL is not a Redis command.');
+  Future<List<int>> xAckDel(
+    String key,
+    String group,
+    List<String> ids, {
+    StreamDeletionPolicy policy = StreamDeletionPolicy.keepRef,
+  }) async {
+    final args = <dynamic>['XACKDEL', key, group];
+    _appendStreamDeletionIds(args, ids, policy);
+    final res = await sendCommand(args);
+    return _streamReplyAsIntList(res);
   }
 
   List<StreamMessage> _parseStreamList(dynamic res) {
