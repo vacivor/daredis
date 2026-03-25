@@ -34,6 +34,13 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return Decoders.toBool(res);
   }
 
+  /// Returns membership flags for all [members] in request order.
+  Future<List<bool>> sMisMember(String key, List<String> members) async {
+    final res = await sendCommand(['SMISMEMBER', key, ...members]);
+    if (res is! List) return const [];
+    return res.map(Decoders.toBool).toList(growable: false);
+  }
+
   /// Returns the cardinality of the set at [key].
   Future<int> sCard(String key) async {
     final res = await sendCommand(['SCARD', key]);

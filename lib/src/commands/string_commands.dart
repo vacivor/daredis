@@ -1,6 +1,28 @@
 part of '../../daredis.dart';
 
 mixin RedisStringCommands on RedisCommandExecutor {
+  void _appendDelexCondition(
+    List<dynamic> args, {
+    String? ifEq,
+    String? ifNe,
+    String? ifDigestEq,
+    String? ifDigestNe,
+  }) {
+    final conditions = [
+      if (ifEq != null) 'IFEQ',
+      if (ifNe != null) 'IFNE',
+      if (ifDigestEq != null) 'IFDEQ',
+      if (ifDigestNe != null) 'IFDNE',
+    ];
+    if (conditions.length > 1) {
+      throw ArgumentError('DELEX accepts only one conditional option');
+    }
+    if (ifEq != null) args.addAll(['IFEQ', ifEq]);
+    if (ifNe != null) args.addAll(['IFNE', ifNe]);
+    if (ifDigestEq != null) args.addAll(['IFDEQ', ifDigestEq]);
+    if (ifDigestNe != null) args.addAll(['IFDNE', ifDigestNe]);
+  }
+
   /// Returns the string value stored at [key], or `null` when the key is absent.
   Future<String?> get(String key) async {
     var res = await sendCommand(['GET', key]);
@@ -260,6 +282,32 @@ mixin RedisStringCommands on RedisCommandExecutor {
   Future<String?> substr(String key, int start, int end) async {
     final res = await sendCommand(['SUBSTR', key, start, end]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Returns the XXH3 digest for the string stored at [key].
+  Future<String?> digest(String key) async {
+    final res = await sendCommand(['DIGEST', key]);
+    return Decoders.toStringOrNull(res);
+  }
+
+  /// Deletes [key], optionally applying a single conditional check first.
+  Future<bool> delex(
+    String key, {
+    String? ifEq,
+    String? ifNe,
+    String? ifDigestEq,
+    String? ifDigestNe,
+  }) async {
+    final args = <dynamic>['DELEX', key];
+    _appendDelexCondition(
+      args,
+      ifEq: ifEq,
+      ifNe: ifNe,
+      ifDigestEq: ifDigestEq,
+      ifDigestNe: ifDigestNe,
+    );
+    final res = await sendCommand(args);
+    return Decoders.toBool(res);
   }
 
   /// Sets multiple string key/value pairs atomically with shared expiry options.

@@ -13,11 +13,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 306
+- Ready: 323
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 125
+- Raw only: 108
 
 ## String commands
 
@@ -26,8 +26,8 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `APPEND` | Yes | Yes | Ready | Appends a string to the value of a key. Creates the key if it doesn't exist. |
 | `DECR` | Yes | Yes | Ready | Decrements the integer value of a key by one. Uses 0 as initial value if the key doesn't exist. |
 | `DECRBY` | Yes | Yes | Ready | Decrements a number from the integer value of a key. Uses 0 as initial value if the key doesn't exist. |
-| `DELEX` | No | No | Raw only | Raw only |
-| `DIGEST` | No | No | Raw only | Raw only |
+| `DELEX` | Yes | Yes | Ready | Conditionally deletes a string key by value or digest checks. |
+| `DIGEST` | Yes | Yes | Ready | Returns the XXH3 digest of a string value. |
 | `GET` | Yes | Yes | Ready | Returns the string value of a key. |
 | `GETDEL` | Yes | Yes | Ready | Returns the string value of a key after deleting the key. |
 | `GETEX` | Yes | Yes | Ready | Returns the string value of a key after setting its expiration time. |
@@ -54,31 +54,31 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | --- | --- | --- | --- | --- |
 | `HDEL` | Yes | Yes | Ready | Deletes one or more fields and their values from a hash. Deletes the hash if no fields remain. |
 | `HEXISTS` | Yes | Yes | Ready | Determines whether a field exists in a hash. |
-| `HEXPIRE` | No | No | Raw only | Raw only |
-| `HEXPIREAT` | No | No | Raw only | Raw only |
-| `HEXPIRETIME` | No | No | Raw only | Raw only |
+| `HEXPIRE` | Yes | Yes | Ready | Sets per-field expiration times in seconds. |
+| `HEXPIREAT` | Yes | Yes | Ready | Sets per-field absolute expiration times in seconds. |
+| `HEXPIRETIME` | Yes | Yes | Ready | Returns per-field absolute expiration timestamps in seconds. |
 | `HGET` | Yes | Yes | Ready | Returns the value of a field in a hash. |
 | `HGETALL` | Yes | Yes | Ready | Returns all fields and values in a hash. |
-| `HGETDEL` | No | No | Raw only | Raw only |
-| `HGETEX` | No | No | Raw only | Raw only |
+| `HGETDEL` | Yes | Yes | Ready | Gets and deletes one or more hash fields. |
+| `HGETEX` | Yes | Yes | Ready | Gets hash fields and optionally updates their expiration. |
 | `HINCRBY` | Yes | Yes | Ready | Increments the integer value of a field in a hash by a number. Uses 0 as initial value if the field doesn't exist. |
 | `HINCRBYFLOAT` | Yes | Yes | Ready | Increments the floating point value of a field by a number. Uses 0 as initial value if the field doesn't exist. |
 | `HKEYS` | Yes | Yes | Ready | Returns all fields in a hash. |
 | `HLEN` | Yes | Yes | Ready | Returns the number of fields in a hash. |
 | `HMGET` | Yes | Yes | Ready | Returns the values of all fields in a hash. |
 | `HMSET` | Yes | Yes | Ready | Sets the values of multiple fields. |
-| `HPERSIST` | No | No | Raw only | Raw only |
-| `HPEXPIRE` | No | No | Raw only | Raw only |
-| `HPEXPIREAT` | No | No | Raw only | Raw only |
-| `HPEXPIRETIME` | No | No | Raw only | Raw only |
-| `HPTTL` | No | No | Raw only | Raw only |
-| `HRANDFIELD` | No | No | Raw only | Raw only |
+| `HPERSIST` | Yes | Yes | Ready | Removes expiration metadata from hash fields. |
+| `HPEXPIRE` | Yes | Yes | Ready | Sets per-field expiration times in milliseconds. |
+| `HPEXPIREAT` | Yes | Yes | Ready | Sets per-field absolute expiration times in milliseconds. |
+| `HPEXPIRETIME` | Yes | Yes | Ready | Returns per-field absolute expiration timestamps in milliseconds. |
+| `HPTTL` | Yes | Yes | Ready | Returns per-field remaining TTLs in milliseconds. |
+| `HRANDFIELD` | Yes | Yes | Ready | Returns random hash fields, with optional values. |
 | `HSCAN` | Yes | Yes | Ready | Iterates over fields and values of a hash. |
 | `HSET` | Yes | Yes | Ready | Creates or modifies the value of a field in a hash. |
-| `HSETEX` | No | No | Raw only | Raw only |
+| `HSETEX` | Yes | Yes | Ready | Sets hash fields and optionally updates their expiration metadata. |
 | `HSETNX` | Yes | Yes | Ready | Sets the value of a field in a hash only when the field doesn't exist. |
-| `HSTRLEN` | No | No | Raw only | Raw only |
-| `HTTL` | No | No | Raw only | Raw only |
+| `HSTRLEN` | Yes | Yes | Ready | Returns the string length of a hash field value. |
+| `HTTL` | Yes | Yes | Ready | Returns per-field remaining TTLs in seconds. |
 | `HVALS` | Yes | Yes | Ready | Returns all values in a hash. |
 ## List commands
 
@@ -119,7 +119,7 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `SINTERSTORE` | Yes | Yes | Ready | Stores the intersect of multiple sets in a key. |
 | `SISMEMBER` | Yes | Yes | Ready | Determines whether a member belongs to a set. |
 | `SMEMBERS` | Yes | Yes | Ready | Returns all members of a set. |
-| `SMISMEMBER` | No | No | Raw only | Raw only |
+| `SMISMEMBER` | Yes | Yes | Ready | Checks membership for multiple set members at once. |
 | `SMOVE` | Yes | Yes | Ready | Moves a member from one set to another. |
 | `SPOP` | Yes | Yes | Ready | Returns one or more random members from a set after removing them. Deletes the set if the last member was popped. |
 | `SRANDMEMBER` | Yes | Yes | Ready | Get one or multiple random members from a set |
