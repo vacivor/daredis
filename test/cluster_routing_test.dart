@@ -247,6 +247,54 @@ void main() {
       );
     });
 
+    test('extracts keys from time series commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'TS.ADD',
+          'series:{1}',
+          '*',
+          1,
+        ]),
+        ['series:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'TS.CREATERULE',
+          'source:{1}',
+          'dest:{1}',
+          'AGGREGATION',
+          'AVG',
+          60000,
+        ]),
+        ['source:{1}', 'dest:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'TS.MADD',
+          'series:{1}',
+          1,
+          10,
+          'series:{2}',
+          2,
+          20,
+        ]),
+        ['series:{1}', 'series:{2}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'TS.MRANGE',
+          '-',
+          '+',
+          'FILTER',
+          'sensor=s1',
+        ]),
+        isEmpty,
+      );
+    });
+
     test('extracts direct and KEYS-style migrate keys', () {
       expect(
         ClusterCommandSpec.extractKeys([

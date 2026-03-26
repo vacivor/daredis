@@ -52,6 +52,8 @@ part 'src/commands/hyper_log_log_commands.dart';
 
 part 'src/commands/json_commands.dart';
 
+part 'src/commands/time_series_commands.dart';
+
 part 'src/commands/bitfield_builder.dart';
 
 part 'src/commands/scan_result.dart';

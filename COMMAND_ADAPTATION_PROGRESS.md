@@ -14,11 +14,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 382
+- Ready: 399
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 49
+- Raw only: 32
 
 ## String commands
 
@@ -291,23 +291,23 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `TS.ADD` | No | No | Raw only | Raw only |
-| `TS.ALTER` | No | No | Raw only | Raw only |
-| `TS.CREATE` | No | No | Raw only | Raw only |
-| `TS.CREATERULE` | No | No | Raw only | Raw only |
-| `TS.DECRBY` | No | No | Raw only | Raw only |
-| `TS.DEL` | No | No | Raw only | Raw only |
-| `TS.DELETERULE` | No | No | Raw only | Raw only |
-| `TS.GET` | No | No | Raw only | Raw only |
-| `TS.INCRBY` | No | No | Raw only | Raw only |
-| `TS.INFO` | No | No | Raw only | Raw only |
-| `TS.MADD` | No | No | Raw only | Raw only |
-| `TS.MGET` | No | No | Raw only | Raw only |
-| `TS.MRANGE` | No | No | Raw only | Raw only |
-| `TS.MREVRANGE` | No | No | Raw only | Raw only |
-| `TS.QUERYINDEX` | No | No | Raw only | Raw only |
-| `TS.RANGE` | No | No | Raw only | Raw only |
-| `TS.REVRANGE` | No | No | Raw only | Raw only |
+| `TS.ADD` | Yes | Yes | Ready | Appends a sample and can implicitly create the series with retention, encoding, labels, and duplicate handling options. |
+| `TS.ALTER` | Yes | Yes | Ready | Updates retention, chunk size, duplicate policy, and labels for an existing time series. |
+| `TS.CREATE` | Yes | Yes | Ready | Creates an empty time series with typed creation options. |
+| `TS.CREATERULE` | Yes | Yes | Ready | Creates a compaction rule between a source and destination time series. |
+| `TS.DECRBY` | Yes | Yes | Ready | Decrements the latest sample, with optional timestamp and implicit-create options. |
+| `TS.DEL` | Yes | Yes | Ready | Deletes all samples in an inclusive timestamp range. |
+| `TS.DELETERULE` | Yes | Yes | Ready | Removes a compaction rule between a source and destination time series. |
+| `TS.GET` | Yes | Yes | Ready | Returns the latest sample as a typed timestamp-value pair. |
+| `TS.INCRBY` | Yes | Yes | Ready | Increments the latest sample, with optional timestamp and implicit-create options. |
+| `TS.INFO` | Yes | Yes | Ready | Returns time-series metadata as a normalized map, including label decoding. |
+| `TS.MADD` | Yes | Yes | Ready | Appends samples to multiple time series using typed triplets. |
+| `TS.MGET` | Yes | Yes | Ready | Queries latest samples across matching series with label-selection options and typed results. |
+| `TS.MRANGE` | Yes | Yes | Ready | Queries forward ranges across matching series with filtering, aggregation, label selection, and grouping options. |
+| `TS.MREVRANGE` | Yes | Yes | Ready | Queries reverse ranges across matching series with filtering, aggregation, label selection, and grouping options. |
+| `TS.QUERYINDEX` | Yes | Yes | Ready | Returns the keys matching a label-filter query. |
+| `TS.RANGE` | Yes | Yes | Ready | Queries a forward range from a single time series with filtering and aggregation options. |
+| `TS.REVRANGE` | Yes | Yes | Ready | Queries a reverse range from a single time series with filtering and aggregation options. |
 ## Vector set commands
 
 | Command | Helper | Cluster | Status | Notes |
