@@ -7,6 +7,7 @@ enum KeySpecType {
   singleKeyAtIndex,
   twoKeysAtIndex,
   keysFromIndex,
+  keysEveryNFromIndex,
   keysUntilLast,
   keyValuePairsFrom,
   numKeysAtIndex,
@@ -42,6 +43,9 @@ class CommandSpec {
 
   const CommandSpec.keysFrom(int index)
     : this._(KeySpecType.keysFromIndex, index);
+
+  const CommandSpec.keysEveryNFrom(int index, int step)
+    : this._(KeySpecType.keysEveryNFromIndex, index, step);
 
   const CommandSpec.keysUntilLast(int index)
     : this._(KeySpecType.keysUntilLast, index);
@@ -295,6 +299,31 @@ class ClusterCommandSpec {
     'GEOSEARCH': CommandSpec.singleKeyAt(1),
     'GEOSEARCHSTORE': CommandSpec.twoKeysAt(1),
 
+    'JSON.ARRAPPEND': CommandSpec.singleKeyAt(1),
+    'JSON.ARRINDEX': CommandSpec.singleKeyAt(1),
+    'JSON.ARRINSERT': CommandSpec.singleKeyAt(1),
+    'JSON.ARRLEN': CommandSpec.singleKeyAt(1),
+    'JSON.ARRPOP': CommandSpec.singleKeyAt(1),
+    'JSON.ARRTRIM': CommandSpec.singleKeyAt(1),
+    'JSON.CLEAR': CommandSpec.singleKeyAt(1),
+    'JSON.DEBUG': CommandSpec.singleKeyAt(2),
+    'JSON.DEL': CommandSpec.singleKeyAt(1),
+    'JSON.FORGET': CommandSpec.singleKeyAt(1),
+    'JSON.GET': CommandSpec.singleKeyAt(1),
+    'JSON.MERGE': CommandSpec.singleKeyAt(1),
+    'JSON.MGET': CommandSpec.keysUntilLast(1),
+    'JSON.MSET': CommandSpec.keysEveryNFrom(1, 3),
+    'JSON.NUMINCRBY': CommandSpec.singleKeyAt(1),
+    'JSON.NUMMULTBY': CommandSpec.singleKeyAt(1),
+    'JSON.OBJKEYS': CommandSpec.singleKeyAt(1),
+    'JSON.OBJLEN': CommandSpec.singleKeyAt(1),
+    'JSON.RESP': CommandSpec.singleKeyAt(1),
+    'JSON.SET': CommandSpec.singleKeyAt(1),
+    'JSON.STRAPPEND': CommandSpec.singleKeyAt(1),
+    'JSON.STRLEN': CommandSpec.singleKeyAt(1),
+    'JSON.TOGGLE': CommandSpec.singleKeyAt(1),
+    'JSON.TYPE': CommandSpec.singleKeyAt(1),
+
     'XADD': CommandSpec.singleKeyAt(1),
     'XRANGE': CommandSpec.singleKeyAt(1),
     'XREVRANGE': CommandSpec.singleKeyAt(1),
@@ -345,6 +374,8 @@ class ClusterCommandSpec {
         return [...first, ...second];
       case KeySpecType.keysFromIndex:
         return _keysFrom(command, spec.index!);
+      case KeySpecType.keysEveryNFromIndex:
+        return _keysEveryNFrom(command, spec.index!, spec.secondIndex!);
       case KeySpecType.keysUntilLast:
         return _keysUntilLast(command, spec.index!);
       case KeySpecType.keyValuePairsFrom:
@@ -380,6 +411,19 @@ class ClusterCommandSpec {
   static List<String> _keysFrom(List<dynamic> command, int index) {
     if (command.length <= index) return const [];
     return command.sublist(index).map((value) => keyToString(value)).toList();
+  }
+
+  static List<String> _keysEveryNFrom(
+    List<dynamic> command,
+    int index,
+    int step,
+  ) {
+    if (command.length <= index || step <= 0) return const [];
+    final keys = <String>[];
+    for (var i = index; i < command.length; i += step) {
+      keys.add(keyToString(command[i]));
+    }
+    return keys;
   }
 
   static List<String> _keysUntilLast(List<dynamic> command, int index) {

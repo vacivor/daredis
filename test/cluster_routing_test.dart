@@ -166,6 +166,50 @@ void main() {
       expect(ClusterCommandSpec.extractKeys(['OBJECT', 'HELP']), isEmpty);
     });
 
+    test('extracts keys from RedisJSON commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'JSON.GET',
+          'doc:{1}',
+          r'$.name',
+        ]),
+        ['doc:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'JSON.MGET',
+          'doc:{1}',
+          'doc:{1}:backup',
+          r'$.name',
+        ]),
+        ['doc:{1}', 'doc:{1}:backup'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'JSON.MSET',
+          'doc:{1}',
+          r'$',
+          '{"name":"a"}',
+          'doc:{1}:backup',
+          r'$',
+          '{"name":"b"}',
+        ]),
+        ['doc:{1}', 'doc:{1}:backup'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'JSON.DEBUG',
+          'MEMORY',
+          'doc:{1}',
+          r'$',
+        ]),
+        ['doc:{1}'],
+      );
+    });
+
     test('extracts direct and KEYS-style migrate keys', () {
       expect(
         ClusterCommandSpec.extractKeys([

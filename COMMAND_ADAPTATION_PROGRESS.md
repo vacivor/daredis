@@ -14,11 +14,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 344
+- Ready: 369
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 87
+- Raw only: 62
 
 ## String commands
 
@@ -233,31 +233,31 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `JSON.ARRAPPEND` | No | No | Raw only | Raw only |
-| `JSON.ARRINDEX` | No | No | Raw only | Raw only |
-| `JSON.ARRINSERT` | No | No | Raw only | Raw only |
-| `JSON.ARRLEN` | No | No | Raw only | Raw only |
-| `JSON.ARRPOP` | No | No | Raw only | Raw only |
-| `JSON.ARRTRIM` | No | No | Raw only | Raw only |
-| `JSON.CLEAR` | No | No | Raw only | Raw only |
-| `JSON.DEBUG` | No | No | Raw only | Raw only |
-| `JSON.DEBUG MEMORY` | No | No | Raw only | Raw only |
-| `JSON.DEL` | No | No | Raw only | Raw only |
-| `JSON.FORGET` | No | No | Raw only | Raw only |
-| `JSON.GET` | No | No | Raw only | Raw only |
-| `JSON.MERGE` | No | No | Raw only | Raw only |
-| `JSON.MGET` | No | No | Raw only | Raw only |
-| `JSON.MSET` | No | No | Raw only | Raw only |
-| `JSON.NUMINCRBY` | No | No | Raw only | Raw only |
-| `JSON.NUMMULTBY` | No | No | Raw only | Raw only |
-| `JSON.OBJKEYS` | No | No | Raw only | Raw only |
-| `JSON.OBJLEN` | No | No | Raw only | Raw only |
-| `JSON.RESP` | No | No | Raw only | Raw only |
-| `JSON.SET` | No | No | Raw only | Raw only |
-| `JSON.STRAPPEND` | No | No | Raw only | Raw only |
-| `JSON.STRLEN` | No | No | Raw only | Raw only |
-| `JSON.TOGGLE` | No | No | Raw only | Raw only |
-| `JSON.TYPE` | No | No | Raw only | Raw only |
+| `JSON.ARRAPPEND` | Yes | Yes | Ready | Appends one or more JSON values to an array path and returns updated lengths. |
+| `JSON.ARRINDEX` | Yes | Yes | Ready | Searches a JSON array for a value with optional start and stop bounds. |
+| `JSON.ARRINSERT` | Yes | Yes | Ready | Inserts one or more JSON values into an array at the requested index. |
+| `JSON.ARRLEN` | Yes | Yes | Ready | Returns JSON array lengths for the requested path. |
+| `JSON.ARRPOP` | Yes | Yes | Ready | Pops a JSON array element and returns the serialized value or values. |
+| `JSON.ARRTRIM` | Yes | Yes | Ready | Trims a JSON array to the requested inclusive range. |
+| `JSON.CLEAR` | Yes | Yes | Ready | Clears containers and resets scalar JSON values where supported. |
+| `JSON.DEBUG` | Yes | Yes | Ready | Family-level helper exposed through `jsonDebugMemory(...)`. |
+| `JSON.DEBUG MEMORY` | Yes | Yes | Ready | Returns the memory footprint of a JSON value at a key/path. |
+| `JSON.DEL` | Yes | Yes | Ready | Deletes JSON values at a path and returns the removal count. |
+| `JSON.FORGET` | Yes | Yes | Ready | Alias-style helper for removing JSON values at a path. |
+| `JSON.GET` | Yes | Yes | Ready | Gets JSON in serialized form with optional formatting and multi-path support. |
+| `JSON.MERGE` | Yes | Yes | Ready | Merges a serialized JSON value into the target key and path. |
+| `JSON.MGET` | Yes | Yes | Ready | Gets serialized JSON values for multiple keys at a shared path. |
+| `JSON.MSET` | Yes | Yes | Ready | Sets multiple key/path/value triplets in one operation. |
+| `JSON.NUMINCRBY` | Yes | Yes | Ready | Increments a numeric JSON value and returns the serialized result. |
+| `JSON.NUMMULTBY` | Yes | Yes | Ready | Multiplies a numeric JSON value and returns the serialized result. |
+| `JSON.OBJKEYS` | Yes | Yes | Ready | Returns object keys for the requested JSON path. |
+| `JSON.OBJLEN` | Yes | Yes | Ready | Returns object field counts for the requested JSON path. |
+| `JSON.RESP` | Yes | Yes | Ready | Returns the RESP-normalized structure for the requested JSON value. |
+| `JSON.SET` | Yes | Yes | Ready | Sets a serialized JSON value with optional NX/XX semantics. |
+| `JSON.STRAPPEND` | Yes | Yes | Ready | Appends to a JSON string value and returns updated lengths. |
+| `JSON.STRLEN` | Yes | Yes | Ready | Returns JSON string lengths for the requested path. |
+| `JSON.TOGGLE` | Yes | Yes | Ready | Toggles boolean JSON values and returns the updated states. |
+| `JSON.TYPE` | Yes | Yes | Ready | Returns JSON type names for the requested path. |
 ## Search commands
 
 | Command | Helper | Cluster | Status | Notes |

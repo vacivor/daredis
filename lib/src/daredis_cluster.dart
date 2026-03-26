@@ -92,6 +92,7 @@ class DaredisCluster extends RedisClusterClient
         RedisStreamCommands,
         RedisScriptingCommands,
         RedisGeoCommands,
+        RedisJsonCommands,
         RedisHyperLogLogCommands,
         RedisClusterCommands
     implements RedisPubSubCapable, RedisMonitorCapable {

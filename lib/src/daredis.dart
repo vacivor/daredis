@@ -14,6 +14,7 @@ class Daredis extends RedisClient
         RedisStreamCommands,
         RedisScriptingCommands,
         RedisGeoCommands,
+        RedisJsonCommands,
         RedisHyperLogLogCommands
     implements RedisPubSubCapable, RedisTransactionCapable, RedisMonitorCapable {
   final ConnectionOptions options;
