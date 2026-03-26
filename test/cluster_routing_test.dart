@@ -295,6 +295,12 @@ void main() {
       );
     });
 
+    test('search commands are treated as known no-key commands', () {
+      expect(ClusterCommandSpec.extractKeys(['FT.SEARCH', 'idx', '*']), isEmpty);
+      expect(ClusterCommandPolicy.hasKnownSpec(['FT.SEARCH', 'idx', '*']), isTrue);
+      expect(ClusterCommandSpec.extractKeys(['FT.CREATE', 'idx', 'SCHEMA', 'title', 'TEXT']), isEmpty);
+    });
+
     test('extracts direct and KEYS-style migrate keys', () {
       expect(
         ClusterCommandSpec.extractKeys([

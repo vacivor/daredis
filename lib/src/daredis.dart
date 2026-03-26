@@ -15,6 +15,7 @@ class Daredis extends RedisClient
         RedisScriptingCommands,
         RedisGeoCommands,
         RedisJsonCommands,
+        RedisSearchCommands,
         RedisTimeSeriesCommands,
         RedisVectorSetCommands,
         RedisHyperLogLogCommands

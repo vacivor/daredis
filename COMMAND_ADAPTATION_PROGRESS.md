@@ -14,11 +14,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 399
+- Ready: 424
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 32
+- Raw only: 7
 
 ## String commands
 
@@ -262,31 +262,31 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `FT.AGGREGATE` | No | No | Raw only | Raw only |
-| `FT.ALIASADD` | No | No | Raw only | Raw only |
-| `FT.ALIASDEL` | No | No | Raw only | Raw only |
-| `FT.ALIASUPDATE` | No | No | Raw only | Raw only |
-| `FT.ALTER` | No | No | Raw only | Raw only |
-| `FT.CONFIG GET` | No | No | Raw only | Raw only |
-| `FT.CONFIG SET` | No | No | Raw only | Raw only |
-| `FT.CREATE` | No | No | Raw only | Raw only |
-| `FT.CURSOR DEL` | No | No | Raw only | Raw only |
-| `FT.CURSOR READ` | No | No | Raw only | Raw only |
-| `FT.DICTADD` | No | No | Raw only | Raw only |
-| `FT.DICTDEL` | No | No | Raw only | Raw only |
-| `FT.DICTDUMP` | No | No | Raw only | Raw only |
-| `FT.DROPINDEX` | No | No | Raw only | Raw only |
-| `FT.EXPLAIN` | No | No | Raw only | Raw only |
-| `FT.EXPLAINCLI` | No | No | Raw only | Raw only |
-| `FT.HYBRID` | No | No | Raw only | Raw only |
-| `FT.INFO` | No | No | Raw only | Raw only |
-| `FT.PROFILE` | No | No | Raw only | Raw only |
-| `FT.SEARCH` | No | No | Raw only | Raw only |
-| `FT.SPELLCHECK` | No | No | Raw only | Raw only |
-| `FT.SYNDUMP` | No | No | Raw only | Raw only |
-| `FT.SYNUPDATE` | No | No | Raw only | Raw only |
-| `FT.TAGVALS` | No | No | Raw only | Raw only |
-| `FT._LIST` | No | No | Raw only | Raw only |
+| `FT.AGGREGATE` | Yes | Yes | Ready | Executes RediSearch aggregate pipelines with a thin raw-arguments helper and cursor-aware result parsing. |
+| `FT.ALIASADD` | Yes | Yes | Ready | Creates an alias for an existing RediSearch index. |
+| `FT.ALIASDEL` | Yes | Yes | Ready | Removes a RediSearch index alias. |
+| `FT.ALIASUPDATE` | Yes | Yes | Ready | Repoints an alias to a different RediSearch index. |
+| `FT.ALTER` | Yes | Yes | Ready | Adds schema fields to an existing RediSearch index. |
+| `FT.CONFIG GET` | Yes | Yes | Ready | Returns RediSearch configuration entries as a normalized map. |
+| `FT.CONFIG SET` | Yes | Yes | Ready | Updates a RediSearch configuration option. |
+| `FT.CREATE` | Yes | Yes | Ready | Creates a RediSearch index with typed top-level options and schema field definitions. |
+| `FT.CURSOR DEL` | Yes | Yes | Ready | Deletes a RediSearch aggregation cursor. |
+| `FT.CURSOR READ` | Yes | Yes | Ready | Reads the next page from a RediSearch aggregation cursor. |
+| `FT.DICTADD` | Yes | Yes | Ready | Adds one or more terms to a RediSearch dictionary. |
+| `FT.DICTDEL` | Yes | Yes | Ready | Removes one or more terms from a RediSearch dictionary. |
+| `FT.DICTDUMP` | Yes | Yes | Ready | Returns all terms from a RediSearch dictionary. |
+| `FT.DROPINDEX` | Yes | Yes | Ready | Drops a RediSearch index, optionally deleting its documents. |
+| `FT.EXPLAIN` | Yes | Yes | Ready | Returns the search execution plan as a string. |
+| `FT.EXPLAINCLI` | Yes | Yes | Ready | Returns the CLI-formatted search execution plan. |
+| `FT.HYBRID` | Yes | Yes | Ready | Exposes RediSearch hybrid execution with a thin raw-arguments helper. |
+| `FT.INFO` | Yes | Yes | Ready | Returns RediSearch index metadata as a normalized map. |
+| `FT.PROFILE` | Yes | Yes | Ready | Profiles search and aggregate queries with thin helpers for both modes. |
+| `FT.SEARCH` | Yes | Yes | Ready | Executes RediSearch queries with typed query options and document result decoding. |
+| `FT.SPELLCHECK` | Yes | Yes | Ready | Returns spellcheck suggestions with typed term and suggestion decoding. |
+| `FT.SYNDUMP` | Yes | Yes | Ready | Returns the synonym dictionary as a normalized map. |
+| `FT.SYNUPDATE` | Yes | Yes | Ready | Updates a synonym group for a RediSearch index. |
+| `FT.TAGVALS` | Yes | Yes | Ready | Returns all distinct values for a tag field. |
+| `FT._LIST` | Yes | Yes | Ready | Returns all existing RediSearch indexes. |
 ## Time series commands
 
 | Command | Helper | Cluster | Status | Notes |
