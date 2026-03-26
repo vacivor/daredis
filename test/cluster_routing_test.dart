@@ -210,6 +210,43 @@ void main() {
       );
     });
 
+    test('extracts keys from vector set commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'VADD',
+          'embeddings:{1}',
+          'VALUES',
+          3,
+          1,
+          2,
+          3,
+          'doc:1',
+        ]),
+        ['embeddings:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'VSIM',
+          'embeddings:{1}',
+          'ELE',
+          'doc:1',
+          'COUNT',
+          3,
+        ]),
+        ['embeddings:{1}'],
+      );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'VGETATTR',
+          'embeddings:{1}',
+          'doc:1',
+        ]),
+        ['embeddings:{1}'],
+      );
+    });
+
     test('extracts direct and KEYS-style migrate keys', () {
       expect(
         ClusterCommandSpec.extractKeys([

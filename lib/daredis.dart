@@ -5,6 +5,8 @@
 /// and typed command helpers layered on top of raw Redis replies.
 library;
 
+import 'dart:typed_data';
+
 import 'package:daredis/src/command_executor.dart';
 import 'package:daredis/src/cluster_slots.dart';
 import 'package:daredis/src/commands/decoders.dart';
@@ -35,6 +37,8 @@ part 'src/commands/list_commands.dart';
 part 'src/commands/hash_commands.dart';
 
 part 'src/commands/set_commands.dart';
+
+part 'src/commands/vector_set_commands.dart';
 
 part 'src/commands/zset_commands.dart';
 

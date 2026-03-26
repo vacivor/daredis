@@ -14,11 +14,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 445
-- Ready: 369
+- Ready: 382
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
-- Raw only: 62
+- Raw only: 49
 
 ## String commands
 
@@ -312,19 +312,19 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 | Command | Helper | Cluster | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `VADD` | No | No | Raw only | Raw only |
-| `VCARD` | No | No | Raw only | Raw only |
-| `VDIM` | No | No | Raw only | Raw only |
-| `VEMB` | No | No | Raw only | Raw only |
-| `VGETATTR` | No | No | Raw only | Raw only |
-| `VINFO` | No | No | Raw only | Raw only |
-| `VISMEMBER` | No | No | Raw only | Raw only |
-| `VLINKS` | No | No | Raw only | Raw only |
-| `VRANDMEMBER` | No | No | Raw only | Raw only |
-| `VRANGE` | No | No | Raw only | Raw only |
-| `VREM` | No | No | Raw only | Raw only |
-| `VSETATTR` | No | No | Raw only | Raw only |
-| `VSIM` | No | No | Raw only | Raw only |
+| `VADD` | Yes | Yes | Ready | Adds or updates a vector-set element from `VALUES` or `FP32` input, with optional HNSW tuning and attributes. |
+| `VCARD` | Yes | Yes | Ready | Returns the number of elements in a vector set. |
+| `VDIM` | Yes | Yes | Ready | Returns the configured vector dimension for a vector set. |
+| `VEMB` | Yes | Yes | Ready | Returns a stored embedding and also exposes the `RAW` form through a dedicated helper; the raw blob is currently surfaced as a decoded string because bulk-string replies are not yet binary-safe. |
+| `VGETATTR` | Yes | Yes | Ready | Returns the JSON attributes associated with a vector-set element. |
+| `VINFO` | Yes | Yes | Ready | Returns vector-set metadata normalized as a map. |
+| `VISMEMBER` | Yes | Yes | Ready | Checks whether an element exists in a vector set. |
+| `VLINKS` | Yes | Yes | Ready | Returns HNSW graph neighbors per layer, with optional similarity scores. |
+| `VRANDMEMBER` | Yes | Yes | Ready | Returns one or more random vector-set elements. |
+| `VRANGE` | Yes | Yes | Ready | Returns vector-set elements in lexicographical order over a stateless range window. |
+| `VREM` | Yes | Yes | Ready | Removes an element from a vector set. |
+| `VSETATTR` | Yes | Yes | Ready | Associates or removes JSON attributes for a vector-set element. |
+| `VSIM` | Yes | Yes | Ready | Executes similarity search by element, `VALUES`, or `FP32` query input with typed result decoding. |
 ## Pub/Sub commands
 
 | Command | Helper | Cluster | Status | Notes |

@@ -93,6 +93,7 @@ class DaredisCluster extends RedisClusterClient
         RedisScriptingCommands,
         RedisGeoCommands,
         RedisJsonCommands,
+        RedisVectorSetCommands,
         RedisHyperLogLogCommands,
         RedisClusterCommands
     implements RedisPubSubCapable, RedisMonitorCapable {
@@ -208,6 +209,7 @@ class RedisClusterTransaction extends RedisTransactionSession
         RedisStreamCommands,
         RedisScriptingCommands,
         RedisGeoCommands,
+        RedisVectorSetCommands,
         RedisHyperLogLogCommands,
         RedisTransactionCommands {
   final Connection _connection;

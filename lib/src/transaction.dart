@@ -17,6 +17,7 @@ class RedisTransaction extends RedisTransactionSession
         RedisStreamCommands,
         RedisScriptingCommands,
         RedisGeoCommands,
+        RedisVectorSetCommands,
         RedisHyperLogLogCommands,
         RedisTransactionCommands {
   final Connection _connection;
