@@ -35,7 +35,7 @@ Add `daredis` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  daredis: ^0.1.0
+  daredis: ^0.2.0
 ```
 
 Then run:
@@ -57,9 +57,6 @@ Run one with:
 ```bash
 dart run example/single_node.dart
 ```
-
-Command coverage tracking lives in
-[`COMMAND_ADAPTATION_PROGRESS.md`](COMMAND_ADAPTATION_PROGRESS.md).
 
 ## Quick Start
 

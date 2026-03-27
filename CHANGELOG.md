@@ -1,3 +1,20 @@
+## 0.2.0
+
+### Breaking changes
+
+- Made raw RESP bulk-string replies binary-safe by default, so low-level `sendCommand()` paths now preserve `Uint8List` payloads instead of eagerly decoding them as text.
+- Narrowed command availability to the correct execution surface: dangerous operational commands remain admin-only, and connection-scoped commands such as `WAIT`, `WAITAOF`, `RESET`, `QUIT`, and standalone `SELECT` are exposed only on dedicated sessions.
+
+### Improvements
+
+- Expanded typed command helper coverage across core Redis command families, module commands, and session-specific workflows.
+- Added explicit binary-safe helper variants for common string, hash, list, set, sorted-set, and stream read paths.
+- Added dedicated `MONITOR` support and completed remaining helper coverage for command families that fit the current client/session model.
+
+### Docs
+
+- Removed the standalone command adaptation progress tracker in favor of documenting command access tiers directly in the README and API surface.
+
 ## 0.1.0
 
 ### Breaking changes
