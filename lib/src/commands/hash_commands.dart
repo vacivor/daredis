@@ -89,6 +89,11 @@ mixin RedisHashCommands on RedisCommandExecutor {
     return res.map(Decoders.toInt).toList(growable: false);
   }
 
+  List<Uint8List?> _decodeNullableBytesList(dynamic res) {
+    if (res is! List) return const [];
+    return res.map(Decoders.toBytesOrNull).toList(growable: false);
+  }
+
   List<String?> _decodeNullableStringList(dynamic res) {
     if (res is! List) return const [];
     return res.map(Decoders.toStringOrNull).toList(growable: false);
@@ -106,6 +111,12 @@ mixin RedisHashCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Returns the raw bytes of [field] from [key].
+  Future<Uint8List?> hGetBytes(String key, String field) async {
+    final res = await sendCommand(['HGET', key, field]);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Sets multiple [fieldValues] on the hash stored at [key].
   Future<String> hmSet(String key, Map<String, dynamic> fieldValues) async {
     final args = ['HMSET', key];
@@ -121,6 +132,13 @@ mixin RedisHashCommands on RedisCommandExecutor {
     return List.filled(fields.length, null);
   }
 
+  /// Returns the raw values of [fields] from the hash stored at [key].
+  Future<List<Uint8List?>> hmGetBytes(String key, List<String> fields) async {
+    final res = await sendCommand(['HMGET', key, ...fields]);
+    if (res is List) return res.map(Decoders.toBytesOrNull).toList();
+    return List.filled(fields.length, null);
+  }
+
   /// Returns the entire hash stored at [key].
   Future<Map<String, String>> hGetAll(String key) async {
     final res = await sendCommand(['HGETALL', key]);
@@ -132,6 +150,30 @@ mixin RedisHashCommands on RedisCommandExecutor {
     if (res is List) {
       for (var i = 0; i < res.length; i += 2) {
         map[Decoders.string(res[i])] = Decoders.string(res[i + 1]);
+      }
+    }
+    return map;
+  }
+
+  /// Returns the entire hash stored at [key] with raw byte values.
+  Future<Map<String, Uint8List>> hGetAllBytes(String key) async {
+    final res = await sendCommand(['HGETALL', key]);
+    final map = <String, Uint8List>{};
+    if (res is Map) {
+      res.forEach((k, v) {
+        final bytes = Decoders.toBytesOrNull(v);
+        if (bytes != null) {
+          map[Decoders.string(k)] = bytes;
+        }
+      });
+      return map;
+    }
+    if (res is List) {
+      for (var i = 0; i < res.length; i += 2) {
+        final bytes = Decoders.toBytesOrNull(res[i + 1]);
+        if (bytes != null) {
+          map[Decoders.string(res[i])] = bytes;
+        }
       }
     }
     return map;
@@ -253,6 +295,14 @@ mixin RedisHashCommands on RedisCommandExecutor {
     return _decodeNullableStringList(res);
   }
 
+  /// Returns and deletes the raw values of [fields].
+  Future<List<Uint8List?>> hGetDelBytes(String key, List<String> fields) async {
+    final args = <dynamic>['HGETDEL', key];
+    _appendHashFields(args, fields);
+    final res = await sendCommand(args);
+    return _decodeNullableBytesList(res);
+  }
+
   /// Returns the values of [fields] and optionally updates their expiration.
   Future<List<String?>> hGetEx(
     String key,
@@ -275,6 +325,30 @@ mixin RedisHashCommands on RedisCommandExecutor {
     _appendHashFields(args, fields);
     final res = await sendCommand(args);
     return _decodeNullableStringList(res);
+  }
+
+  /// Returns the raw values of [fields] and optionally updates their expiration.
+  Future<List<Uint8List?>> hGetExBytes(
+    String key,
+    List<String> fields, {
+    int? ex,
+    int? px,
+    int? exAt,
+    int? pxAt,
+    bool persist = false,
+  }) async {
+    final args = <dynamic>['HGETEX', key];
+    _appendHashGetExModifier(
+      args,
+      ex: ex,
+      px: px,
+      exAt: exAt,
+      pxAt: pxAt,
+      persist: persist,
+    );
+    _appendHashFields(args, fields);
+    final res = await sendCommand(args);
+    return _decodeNullableBytesList(res);
   }
 
   /// Returns one random field from the hash at [key].
@@ -318,6 +392,13 @@ mixin RedisHashCommands on RedisCommandExecutor {
     final res = await sendCommand(['HVALS', key]);
     if (res is List) return res.map(Decoders.string).toList();
     return [];
+  }
+
+  /// Returns all field values from the hash stored at [key] as raw bytes.
+  Future<List<Uint8List>> hValsBytes(String key) async {
+    final res = await sendCommand(['HVALS', key]);
+    if (res is! List) return const [];
+    return res.map(Decoders.bytes).toList(growable: false);
   }
 
   /// Returns the number of fields in the hash stored at [key].

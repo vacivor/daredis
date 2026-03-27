@@ -168,6 +168,12 @@ mixin RedisKeyCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Returns the serialized value stored at [key] as raw bytes.
+  Future<Uint8List?> dumpBytes(String key) async {
+    final res = await sendCommand(['DUMP', key]);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Restores a value created by [dump] into [key].
   Future<String> restore(
     String key,

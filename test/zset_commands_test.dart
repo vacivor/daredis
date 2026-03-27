@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
@@ -195,6 +197,90 @@ void main() {
         executor.lastCommand,
         ['BZPOPMAX', 'leaderboard:{1}', 'backup:{1}', 3],
       );
+    });
+
+    test('bytes helpers preserve raw sorted-set payloads', () async {
+      final executor = _FakeZSetExecutor()
+        ..response = Uint8List.fromList([1, 2]);
+
+      expect(
+        await executor.zRandMemberBytes('leaderboard:{1}'),
+        [Uint8List.fromList([1, 2])],
+      );
+      expect(executor.lastCommand, ['ZRANDMEMBER', 'leaderboard:{1}']);
+
+      executor.response = [Uint8List.fromList([3]), Uint8List.fromList([4])];
+      expect(
+        await executor.zRangeBytes('leaderboard:{1}', 0, 1),
+        [Uint8List.fromList([3]), Uint8List.fromList([4])],
+      );
+      expect(executor.lastCommand, ['ZRANGE', 'leaderboard:{1}', 0, 1]);
+
+      executor.response = [Uint8List.fromList([5]), Uint8List.fromList([6])];
+      expect(
+        await executor.zRevRangeByScoreBytes(
+          'leaderboard:{1}',
+          '+inf',
+          '-inf',
+          withScores: true,
+          offset: 0,
+          count: 1,
+        ),
+        [Uint8List.fromList([5]), Uint8List.fromList([6])],
+      );
+      expect(executor.lastCommand, [
+        'ZREVRANGEBYSCORE',
+        'leaderboard:{1}',
+        '+inf',
+        '-inf',
+        'WITHSCORES',
+        'LIMIT',
+        0,
+        1,
+      ]);
+
+      executor.response = [Uint8List.fromList([7]), Uint8List.fromList([8])];
+      expect(
+        await executor.zPopMinBytes('leaderboard:{1}', 1),
+        [Uint8List.fromList([7]), Uint8List.fromList([8])],
+      );
+      expect(executor.lastCommand, ['ZPOPMIN', 'leaderboard:{1}', 1]);
+
+      executor.response = [
+        'leaderboard:{1}',
+        [
+          [Uint8List.fromList([9]), '1.5'],
+          [Uint8List.fromList([10]), '2.0'],
+        ],
+      ];
+      final zmpop = await executor.zMPopBytes(['leaderboard:{1}'], 'MAX', count: 2);
+      expect(zmpop, isNotNull);
+      expect(
+        zmpop!.entries.map((entry) => entry.member),
+        [Uint8List.fromList([9]), Uint8List.fromList([10])],
+      );
+      expect(zmpop.entries.map((entry) => entry.score), [1.5, 2.0]);
+      expect(executor.lastCommand, ['ZMPOP', 1, 'leaderboard:{1}', 'MAX', 'COUNT', 2]);
+
+      executor.response = ['leaderboard:{1}', Uint8List.fromList([11]), '8.0'];
+      final bzpop = await executor.bZPopMaxBytes(['leaderboard:{1}'], 3);
+      expect(bzpop, isNotNull);
+      expect(bzpop!.entries.single.member, Uint8List.fromList([11]));
+      expect(bzpop.entries.single.score, 8.0);
+      expect(executor.lastCommand, ['BZPOPMAX', 'leaderboard:{1}', 3]);
+
+      executor.response = ['0', [Uint8List.fromList([12]), '1.0', Uint8List.fromList([13]), '2.5']];
+      final scan = await executor.zScanBytes('leaderboard:{1}', 0, count: 10);
+      expect(scan.cursor, 0);
+      expect(
+        scan.items.map((entry) => entry.key),
+        [Uint8List.fromList([12]), Uint8List.fromList([13])],
+      );
+      expect(
+        scan.items.map((entry) => entry.value),
+        [1.0, 2.5],
+      );
+      expect(executor.lastCommand, ['ZSCAN', 'leaderboard:{1}', 0, 'COUNT', 10]);
     });
   });
 }

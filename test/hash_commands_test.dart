@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
@@ -162,6 +164,75 @@ void main() {
         2,
         'WITHVALUES',
       ]);
+    });
+
+    test('bytes helpers preserve raw hash payloads', () async {
+      final executor = _FakeHashExecutor()
+        ..response = Uint8List.fromList([1, 2, 3]);
+
+      expect(
+        await executor.hGetBytes('hash:{1}', 'field1'),
+        Uint8List.fromList([1, 2, 3]),
+      );
+      expect(executor.lastCommand, ['HGET', 'hash:{1}', 'field1']);
+
+      executor.response = [Uint8List.fromList([4]), null, Uint8List.fromList([5, 6])];
+      expect(
+        await executor.hmGetBytes('hash:{1}', ['a', 'b', 'c']),
+        [Uint8List.fromList([4]), null, Uint8List.fromList([5, 6])],
+      );
+      expect(executor.lastCommand, ['HMGET', 'hash:{1}', 'a', 'b', 'c']);
+
+      executor.response = [
+        'field1',
+        Uint8List.fromList([7, 8]),
+        'field2',
+        Uint8List.fromList([9]),
+      ];
+      expect(
+        await executor.hGetAllBytes('hash:{1}'),
+        {
+          'field1': Uint8List.fromList([7, 8]),
+          'field2': Uint8List.fromList([9]),
+        },
+      );
+      expect(executor.lastCommand, ['HGETALL', 'hash:{1}']);
+
+      executor.response = [Uint8List.fromList([10]), null];
+      expect(
+        await executor.hGetDelBytes('hash:{1}', ['a', 'b']),
+        [Uint8List.fromList([10]), null],
+      );
+      expect(executor.lastCommand, [
+        'HGETDEL',
+        'hash:{1}',
+        'FIELDS',
+        2,
+        'a',
+        'b',
+      ]);
+
+      executor.response = [Uint8List.fromList([11, 12])];
+      expect(
+        await executor.hGetExBytes('hash:{1}', ['a'], px: 500),
+        [Uint8List.fromList([11, 12])],
+      );
+      expect(executor.lastCommand, [
+        'HGETEX',
+        'hash:{1}',
+        'PX',
+        500,
+        'FIELDS',
+        1,
+        'a',
+      ]);
+
+      executor.response = [Uint8List.fromList([13]), Uint8List.fromList([14, 15])];
+      expect(
+        await executor.hValsBytes('hash:{1}'),
+        [Uint8List.fromList([13]), Uint8List.fromList([14, 15])],
+      );
+      expect(executor.lastCommand, ['HVALS', 'hash:{1}']);
     });
 
     test('hSetEx and hStrLen build exact commands', () async {

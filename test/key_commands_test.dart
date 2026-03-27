@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
@@ -20,6 +22,16 @@ void main() {
       final result = await executor.dump('user:{1}');
 
       expect(result, 'serialized');
+      expect(executor.lastCommand, ['DUMP', 'user:{1}']);
+    });
+
+    test('dumpBytes preserves the serialized binary payload', () async {
+      final executor = _FakeKeyExecutor()
+        ..response = Uint8List.fromList([1, 0, 255, 42]);
+
+      final result = await executor.dumpBytes('user:{1}');
+
+      expect(result, Uint8List.fromList([1, 0, 255, 42]));
       expect(executor.lastCommand, ['DUMP', 'user:{1}']);
     });
 

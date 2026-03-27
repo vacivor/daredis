@@ -29,6 +29,12 @@ mixin RedisStringCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Returns the raw bytes stored at [key], or `null` when the key is absent.
+  Future<Uint8List?> getBytes(String key) async {
+    final res = await sendCommand(['GET', key]);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Sets [key] to [value].
   ///
   /// Optional flags map to the standard Redis `SET` modifiers such as `EX`,
@@ -87,6 +93,12 @@ mixin RedisStringCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Returns the raw bytes of [key] and deletes the key.
+  Future<Uint8List?> getDelBytes(String key) async {
+    final res = await sendCommand(['GETDEL', key]);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Returns the value of [key] while optionally updating its expiry.
   Future<String?> getEx(
     String key, {
@@ -105,10 +117,34 @@ mixin RedisStringCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Returns the raw bytes of [key] while optionally updating its expiry.
+  Future<Uint8List?> getExBytes(
+    String key, {
+    int? ex,
+    int? px,
+    bool? nx,
+    bool? xx,
+  }) async {
+    final args = <dynamic>['GETEX', key];
+    if (ex != null) args.addAll(['EX', ex]);
+    if (px != null) args.addAll(['PX', px]);
+    if (nx == true) args.add('NX');
+    if (xx == true) args.add('XX');
+
+    final res = await sendCommand(args);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Replaces the value at [key] and returns the previous value.
   Future<String?> getSet(String key, String value) async {
     final res = await sendCommand(['GETSET', key, value]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Replaces the value at [key] and returns the previous raw bytes.
+  Future<Uint8List?> getSetBytes(String key, String value) async {
+    final res = await sendCommand(['GETSET', key, value]);
+    return Decoders.toBytesOrNull(res);
   }
 
   /// Overwrites the value at [key] starting at [offset].
@@ -128,6 +164,13 @@ mixin RedisStringCommands on RedisCommandExecutor {
     final res = await sendCommand(['MGET', ...keys]);
     if (res is List) return res.map(Decoders.toStringOrNull).toList();
     return [];
+  }
+
+  /// Returns the raw values for all [keys] in request order.
+  Future<List<Uint8List?>> mGetBytes(List<String> keys) async {
+    final res = await sendCommand(['MGET', ...keys]);
+    if (res is! List) return const [];
+    return res.map(Decoders.toBytesOrNull).toList(growable: false);
   }
 
   /// Sets multiple string key/value pairs atomically.

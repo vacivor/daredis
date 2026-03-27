@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
@@ -92,6 +94,92 @@ void main() {
       expect(
         executor.lastCommand,
         ['XACKDEL', 'stream:{1}', 'group-a', 'DELREF', 'IDS', 2, '1-0', '2-0'],
+      );
+    });
+
+    test('bytes helpers preserve stream field payloads', () async {
+      final executor = _FakeStreamExecutor()
+        ..response = [
+          [
+            '1-0',
+            [
+              Uint8List.fromList([1]),
+              Uint8List.fromList([2, 3]),
+            ],
+          ],
+        ];
+
+      final range = await executor.xRangeBytes('stream:{1}', '-', '+', count: 1);
+      expect(range.single.id, '1-0');
+      expect(range.single.fields.single.key, Uint8List.fromList([1]));
+      expect(range.single.fields.single.value, Uint8List.fromList([2, 3]));
+      expect(executor.lastCommand, ['XRANGE', 'stream:{1}', '-', '+', 'COUNT', '1']);
+
+      executor.response = [
+        [
+          'stream:{1}',
+          [
+            [
+              '2-0',
+              [
+                Uint8List.fromList([4]),
+                Uint8List.fromList([5]),
+              ],
+            ],
+          ],
+        ],
+      ];
+      final read = await executor.xReadBytes(
+        count: 1,
+        keys: ['stream:{1}'],
+        ids: ['0-0'],
+      );
+      expect(read.single.keys.single, 'stream:{1}');
+      expect(
+        read.single.values.single.single.fields.single.key,
+        Uint8List.fromList([4]),
+      );
+      expect(
+        read.single.values.single.single.fields.single.value,
+        Uint8List.fromList([5]),
+      );
+      expect(
+        executor.lastCommand,
+        ['XREAD', 'COUNT', '1', 'STREAMS', 'stream:{1}', '0-0'],
+      );
+
+      executor.response = [
+        '0-0',
+        [
+          [
+            '3-0',
+            [
+              Uint8List.fromList([6]),
+              Uint8List.fromList([7]),
+            ],
+          ],
+        ],
+      ];
+      final autoClaim = await executor.xAutoClaimBytes(
+        'stream:{1}',
+        'group-a',
+        'consumer-a',
+        5000,
+        '0-0',
+        count: 1,
+      );
+      expect(autoClaim.single.id, '3-0');
+      expect(
+        autoClaim.single.fields.single.key,
+        Uint8List.fromList([6]),
+      );
+      expect(
+        autoClaim.single.fields.single.value,
+        Uint8List.fromList([7]),
+      );
+      expect(
+        executor.lastCommand,
+        ['XAUTOCLAIM', 'stream:{1}', 'group-a', 'consumer-a', 5000, '0-0', 'COUNT', 1],
       );
     });
   });

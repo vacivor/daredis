@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
@@ -51,6 +53,38 @@ void main() {
         60,
         'NX',
       ]);
+    });
+
+    test('bytes helpers preserve binary payloads', () async {
+      final executor = _FakeStringExecutor()
+        ..response = Uint8List.fromList([0, 255, 1, 2]);
+
+      expect(await executor.getBytes('blob:{1}'), Uint8List.fromList([0, 255, 1, 2]));
+      expect(executor.lastCommand, ['GET', 'blob:{1}']);
+
+      executor.response = [
+        Uint8List.fromList([1, 2]),
+        null,
+        Uint8List.fromList([3, 4]),
+      ];
+      expect(await executor.mGetBytes(['a:{1}', 'b:{1}', 'c:{1}']), [
+        Uint8List.fromList([1, 2]),
+        null,
+        Uint8List.fromList([3, 4]),
+      ]);
+      expect(executor.lastCommand, ['MGET', 'a:{1}', 'b:{1}', 'c:{1}']);
+
+      executor.response = Uint8List.fromList([9, 8, 7]);
+      expect(await executor.getDelBytes('blob:{1}'), Uint8List.fromList([9, 8, 7]));
+      expect(executor.lastCommand, ['GETDEL', 'blob:{1}']);
+
+      executor.response = Uint8List.fromList([6, 5, 4]);
+      expect(await executor.getExBytes('blob:{1}', ex: 10), Uint8List.fromList([6, 5, 4]));
+      expect(executor.lastCommand, ['GETEX', 'blob:{1}', 'EX', 10]);
+
+      executor.response = Uint8List.fromList([3, 2, 1]);
+      expect(await executor.getSetBytes('blob:{1}', 'next'), Uint8List.fromList([3, 2, 1]));
+      expect(executor.lastCommand, ['GETSET', 'blob:{1}', 'next']);
     });
   });
 }

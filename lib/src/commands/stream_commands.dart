@@ -7,6 +7,13 @@ class StreamMessage {
   StreamMessage(this.id, this.fields);
 }
 
+class StreamBytesMessage {
+  final String id;
+  final List<MapEntry<Uint8List, Uint8List>> fields;
+
+  StreamBytesMessage(this.id, this.fields);
+}
+
 class StreamPendingInfo {
   final int count;
   final String? lowerId;
@@ -190,6 +197,18 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     return _parseStreamList(res);
   }
 
+  Future<List<StreamBytesMessage>> xRangeBytes(
+    String key,
+    String start,
+    String end, {
+    int? count,
+  }) async {
+    final args = ['XRANGE', key, start, end];
+    if (count != null) args.addAll(['COUNT', count.toString()]);
+    final res = await sendCommand(args);
+    return _parseStreamBytesList(res);
+  }
+
   Future<List<Map<String, List<StreamMessage>>>> xRead({
     int? count,
     int? block,
@@ -205,6 +224,23 @@ mixin RedisStreamCommands on RedisCommandExecutor {
 
     final res = await sendCommand(args);
     return _parseStreamRead(res);
+  }
+
+  Future<List<Map<String, List<StreamBytesMessage>>>> xReadBytes({
+    int? count,
+    int? block,
+    required List<String> keys,
+    required List<String> ids,
+  }) async {
+    final args = ['XREAD'];
+    if (count != null) args.addAll(['COUNT', count.toString()]);
+    if (block != null) args.addAll(['BLOCK', block.toString()]);
+    args.add('STREAMS');
+    args.addAll(keys);
+    args.addAll(ids);
+
+    final res = await sendCommand(args);
+    return _parseStreamBytesRead(res);
   }
 
   Future<int> xLen(String key) async {
@@ -243,6 +279,18 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     if (count != null) args.addAll(['COUNT', count.toString()]);
     final res = await sendCommand(args);
     return _parseStreamList(res);
+  }
+
+  Future<List<StreamBytesMessage>> xRevRangeBytes(
+    String key,
+    String end,
+    String start, {
+    int? count,
+  }) async {
+    final args = ['XREVRANGE', key, end, start];
+    if (count != null) args.addAll(['COUNT', count.toString()]);
+    final res = await sendCommand(args);
+    return _parseStreamBytesList(res);
   }
 
   Future<int> xAck(String key, String group, List<String> ids) async {
@@ -333,6 +381,24 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     return _parseStreamRead(res);
   }
 
+  Future<List<Map<String, List<StreamBytesMessage>>>> xReadGroupBytes({
+    required String group,
+    required String consumer,
+    int? count,
+    int? block,
+    required List<String> keys,
+    required List<String> ids,
+  }) async {
+    final args = ['XREADGROUP', 'GROUP', group, consumer];
+    if (count != null) args.addAll(['COUNT', count.toString()]);
+    if (block != null) args.addAll(['BLOCK', block.toString()]);
+    args.add('STREAMS');
+    args.addAll(keys);
+    args.addAll(ids);
+    final res = await sendCommand(args);
+    return _parseStreamBytesRead(res);
+  }
+
   Future<StreamPendingInfo> xPending(
     String key,
     String group, {
@@ -386,6 +452,26 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     return _parseStreamList(res);
   }
 
+  Future<List<StreamBytesMessage>> xClaimBytes(
+    String key,
+    String group,
+    String consumer,
+    int minIdleTime,
+    List<String> ids, {
+    bool? idle,
+    bool? time,
+    bool? retryCount,
+    bool? force,
+  }) async {
+    final args = ['XCLAIM', key, group, consumer, minIdleTime, ...ids];
+    if (idle != null && idle) args.add('IDLE');
+    if (time != null && time) args.add('TIME');
+    if (retryCount != null && retryCount) args.add('RETRYCOUNT');
+    if (force != null && force) args.add('FORCE');
+    final res = await sendCommand(args);
+    return _parseStreamBytesList(res);
+  }
+
   Future<List<StreamMessage>> xAutoClaim(
     String key,
     String group,
@@ -401,6 +487,25 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     final res = await sendCommand(args);
     if (res is List && res.length == 2 && res[1] is List) {
       return _parseStreamList(res[1]);
+    }
+    return [];
+  }
+
+  Future<List<StreamBytesMessage>> xAutoClaimBytes(
+    String key,
+    String group,
+    String consumer,
+    int minIdleTime,
+    String start, {
+    int? count,
+    bool justId = false,
+  }) async {
+    final args = ['XAUTOCLAIM', key, group, consumer, minIdleTime, start];
+    if (count != null) args.addAll(['COUNT', count]);
+    if (justId) args.add('JUSTID');
+    final res = await sendCommand(args);
+    if (res is List && res.length == 2 && res[1] is List) {
+      return _parseStreamBytesList(res[1]);
     }
     return [];
   }
@@ -528,6 +633,30 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     return [];
   }
 
+  List<StreamBytesMessage> _parseStreamBytesList(dynamic res) {
+    if (res is List) {
+      return res.map((item) {
+        if (item is List && item.length == 2) {
+          final id = Decoders.string(item[0]);
+          final fields = <MapEntry<Uint8List, Uint8List>>[];
+          if (item[1] is List) {
+            for (var i = 0; i < (item[1] as List).length; i += 2) {
+              fields.add(
+                MapEntry(
+                  Decoders.bytes((item[1] as List)[i]),
+                  Decoders.bytes((item[1] as List)[i + 1]),
+                ),
+              );
+            }
+          }
+          return StreamBytesMessage(id, fields);
+        }
+        throw DaredisProtocolException('Unexpected StreamMessage: $item');
+      }).toList();
+    }
+    return [];
+  }
+
   List<Map<String, List<StreamMessage>>> _parseStreamRead(dynamic res) {
     final result = <Map<String, List<StreamMessage>>>[];
     if (res is List) {
@@ -535,6 +664,20 @@ mixin RedisStreamCommands on RedisCommandExecutor {
         if (streamItem is List && streamItem.length == 2) {
           final key = Decoders.string(streamItem[0]);
           final messages = _parseStreamList(streamItem[1]);
+          result.add({key: messages});
+        }
+      }
+    }
+    return result;
+  }
+
+  List<Map<String, List<StreamBytesMessage>>> _parseStreamBytesRead(dynamic res) {
+    final result = <Map<String, List<StreamBytesMessage>>>[];
+    if (res is List) {
+      for (var streamItem in res) {
+        if (streamItem is List && streamItem.length == 2) {
+          final key = Decoders.string(streamItem[0]);
+          final messages = _parseStreamBytesList(streamItem[1]);
           result.add({key: messages});
         }
       }

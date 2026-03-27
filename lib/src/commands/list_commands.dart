@@ -7,6 +7,13 @@ class ListPopResult {
   ListPopResult(this.key, this.values);
 }
 
+class ListPopBytesResult {
+  final String key;
+  final List<Uint8List> values;
+
+  ListPopBytesResult(this.key, this.values);
+}
+
 mixin RedisListCommands on RedisCommandExecutor {
   /// Pushes one or more [values] onto the head of the list at [key].
   Future<int> lPush(String key, dynamic values) async {
@@ -54,6 +61,12 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Pops and returns the first raw element of the list at [key].
+  Future<Uint8List?> lPopBytes(String key) async {
+    final res = await sendCommand(['LPOP', key]);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Pops up to [count] elements from the head of the list at [key].
   Future<List<String>> lPopCount(String key, int count) async {
     final res = await sendCommand(['LPOP', key, count]);
@@ -62,10 +75,24 @@ mixin RedisListCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Pops up to [count] raw elements from the head of the list at [key].
+  Future<List<Uint8List>> lPopCountBytes(String key, int count) async {
+    final res = await sendCommand(['LPOP', key, count]);
+    if (res is List) return res.map(Decoders.bytes).toList(growable: false);
+    if (res != null) return [Decoders.bytes(res)];
+    return const [];
+  }
+
   /// Pops and returns the last element of the list at [key].
   Future<String?> rPop(String key) async {
     final res = await sendCommand(['RPOP', key]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Pops and returns the last raw element of the list at [key].
+  Future<Uint8List?> rPopBytes(String key) async {
+    final res = await sendCommand(['RPOP', key]);
+    return Decoders.toBytesOrNull(res);
   }
 
   /// Pops up to [count] elements from the tail of the list at [key].
@@ -76,11 +103,26 @@ mixin RedisListCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Pops up to [count] raw elements from the tail of the list at [key].
+  Future<List<Uint8List>> rPopCountBytes(String key, int count) async {
+    final res = await sendCommand(['RPOP', key, count]);
+    if (res is List) return res.map(Decoders.bytes).toList(growable: false);
+    if (res != null) return [Decoders.bytes(res)];
+    return const [];
+  }
+
   /// Returns the elements of the list at [key] between [start] and [stop].
   Future<List<String>> lRange(String key, int start, int stop) async {
     final res = await sendCommand(['LRANGE', key, start, stop]);
     if (res is List) return res.map(Decoders.string).toList();
     return [];
+  }
+
+  /// Returns the raw elements of the list at [key] between [start] and [stop].
+  Future<List<Uint8List>> lRangeBytes(String key, int start, int stop) async {
+    final res = await sendCommand(['LRANGE', key, start, stop]);
+    if (res is List) return res.map(Decoders.bytes).toList(growable: false);
+    return const [];
   }
 
   /// Returns the length of the list at [key].
@@ -93,6 +135,12 @@ mixin RedisListCommands on RedisCommandExecutor {
   Future<String?> lIndex(String key, int index) async {
     final res = await sendCommand(['LINDEX', key, index]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Returns the raw list element at [index].
+  Future<Uint8List?> lIndexBytes(String key, int index) async {
+    final res = await sendCommand(['LINDEX', key, index]);
+    return Decoders.toBytesOrNull(res);
   }
 
   /// Returns matching positions of [element] in the list at [key].
@@ -157,6 +205,15 @@ mixin RedisListCommands on RedisCommandExecutor {
     return null;
   }
 
+  /// Blocks until a raw element can be popped from the head of one of [keys].
+  Future<Map<String, Uint8List>?> bLPopBytes(List<String> keys, int timeout) async {
+    final res = await sendCommand(['BLPOP', ...keys, timeout]);
+    if (res is List && res.length == 2) {
+      return {Decoders.string(res[0]): Decoders.bytes(res[1])};
+    }
+    return null;
+  }
+
   /// Blocks until an element can be popped from the tail of one of [keys].
   Future<Map<String, String>?> bRPop(List<String> keys, int timeout) async {
     final res = await sendCommand(['BRPOP', ...keys, timeout]);
@@ -166,10 +223,25 @@ mixin RedisListCommands on RedisCommandExecutor {
     return null;
   }
 
+  /// Blocks until a raw element can be popped from the tail of one of [keys].
+  Future<Map<String, Uint8List>?> bRPopBytes(List<String> keys, int timeout) async {
+    final res = await sendCommand(['BRPOP', ...keys, timeout]);
+    if (res is List && res.length == 2) {
+      return {Decoders.string(res[0]): Decoders.bytes(res[1])};
+    }
+    return null;
+  }
+
   /// Pops from [source] and pushes onto [destination].
   Future<String?> rPopLPush(String source, String destination) async {
     final res = await sendCommand(['RPOPLPUSH', source, destination]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Pops from [source] and pushes onto [destination], returning raw bytes.
+  Future<Uint8List?> rPopLPushBytes(String source, String destination) async {
+    final res = await sendCommand(['RPOPLPUSH', source, destination]);
+    return Decoders.toBytesOrNull(res);
   }
 
   /// Blocking variant of [rPopLPush].
@@ -187,6 +259,21 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Blocking variant of [rPopLPushBytes].
+  Future<Uint8List?> bRPopLPushBytes(
+    String source,
+    String destination,
+    int timeout,
+  ) async {
+    final res = await sendCommand([
+      'BRPOPLPUSH',
+      source,
+      destination,
+      timeout,
+    ]);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Moves one element from [source] to [destination].
   Future<String?> lMove(
     String source,
@@ -202,6 +289,23 @@ mixin RedisListCommands on RedisCommandExecutor {
       whereTo,
     ]);
     return Decoders.toStringOrNull(res);
+  }
+
+  /// Moves one raw element from [source] to [destination].
+  Future<Uint8List?> lMoveBytes(
+    String source,
+    String destination,
+    String whereFrom,
+    String whereTo,
+  ) async {
+    final res = await sendCommand([
+      'LMOVE',
+      source,
+      destination,
+      whereFrom,
+      whereTo,
+    ]);
+    return Decoders.toBytesOrNull(res);
   }
 
   /// Blocking variant of [lMove].
@@ -223,6 +327,25 @@ mixin RedisListCommands on RedisCommandExecutor {
     return Decoders.toStringOrNull(res);
   }
 
+  /// Blocking variant of [lMoveBytes].
+  Future<Uint8List?> bLMoveBytes(
+    String source,
+    String destination,
+    String whereFrom,
+    String whereTo,
+    int timeout,
+  ) async {
+    final res = await sendCommand([
+      'BLMOVE',
+      source,
+      destination,
+      whereFrom,
+      whereTo,
+      timeout,
+    ]);
+    return Decoders.toBytesOrNull(res);
+  }
+
   /// Pops one or more elements from the first non-empty list in [keys].
   Future<ListPopResult?> lMPop(
     List<String> keys,
@@ -233,6 +356,18 @@ mixin RedisListCommands on RedisCommandExecutor {
     if (count != null) args.addAll(['COUNT', count]);
     final res = await sendCommand(args);
     return _parseListPopResult(res);
+  }
+
+  /// Pops one or more raw elements from the first non-empty list in [keys].
+  Future<ListPopBytesResult?> lMPopBytes(
+    List<String> keys,
+    String where, {
+    int? count,
+  }) async {
+    final args = <dynamic>['LMPOP', keys.length, ...keys, where];
+    if (count != null) args.addAll(['COUNT', count]);
+    final res = await sendCommand(args);
+    return _parseListPopBytesResult(res);
   }
 
   /// Blocking variant of [lMPop].
@@ -248,12 +383,36 @@ mixin RedisListCommands on RedisCommandExecutor {
     return _parseListPopResult(res);
   }
 
+  /// Blocking variant of [lMPopBytes].
+  Future<ListPopBytesResult?> bLMPopBytes(
+    int timeout,
+    List<String> keys,
+    String where, {
+    int? count,
+  }) async {
+    final args = <dynamic>['BLMPOP', timeout, keys.length, ...keys, where];
+    if (count != null) args.addAll(['COUNT', count]);
+    final res = await sendCommand(args);
+    return _parseListPopBytesResult(res);
+  }
+
   ListPopResult? _parseListPopResult(dynamic res) {
     if (res == null) return null;
     if (res is List && res.length == 2 && res[1] is List) {
       return ListPopResult(
         Decoders.string(res[0]),
         (res[1] as List).map(Decoders.string).toList(),
+      );
+    }
+    throw DaredisProtocolException('Unexpected list pop response: $res');
+  }
+
+  ListPopBytesResult? _parseListPopBytesResult(dynamic res) {
+    if (res == null) return null;
+    if (res is List && res.length == 2 && res[1] is List) {
+      return ListPopBytesResult(
+        Decoders.string(res[0]),
+        (res[1] as List).map(Decoders.bytes).toList(growable: false),
       );
     }
     throw DaredisProtocolException('Unexpected list pop response: $res');

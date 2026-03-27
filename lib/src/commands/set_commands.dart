@@ -28,6 +28,13 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Returns all raw members of the set at [key].
+  Future<List<Uint8List>> sMembersBytes(String key) async {
+    final res = await sendCommand(['SMEMBERS', key]);
+    if (res is! List) return const [];
+    return res.map(Decoders.bytes).toList(growable: false);
+  }
+
   /// Returns whether [member] belongs to the set at [key].
   Future<bool> sIsMember(String key, String member) async {
     final res = await sendCommand(['SISMEMBER', key, member]);
@@ -49,10 +56,23 @@ mixin RedisSetCommands on RedisCommandExecutor {
 
   /// Pops one or more random members from the set at [key].
   Future<List<String>> sPop(String key, [int? count]) async {
-    final res = await sendCommand(['SPOP', key, ?count]);
+    final args = <dynamic>['SPOP', key];
+    if (count != null) args.add(count);
+    final res = await sendCommand(args);
     if (res is List) return res.map(Decoders.string).toList();
     if (res != null) return [Decoders.string(res)];
     return [];
+  }
+
+  /// Pops one or more random raw members from the set at [key].
+  Future<List<Uint8List>> sPopBytes(String key, [int? count]) async {
+    final args = <dynamic>['SPOP', key];
+    if (count != null) args.add(count);
+    final res = await sendCommand(args);
+    if (res is Uint8List) return [res];
+    if (res is List) return res.map(Decoders.bytes).toList(growable: false);
+    if (res != null) return [Decoders.bytes(res)];
+    return const [];
   }
 
   /// Returns one or more random members from the set at [key] without removing them.
@@ -63,6 +83,17 @@ mixin RedisSetCommands on RedisCommandExecutor {
     if (res is List) return res.map(Decoders.string).toList();
     if (res != null) return [Decoders.string(res)];
     return [];
+  }
+
+  /// Returns one or more random raw members from the set at [key] without removing them.
+  Future<List<Uint8List>> sRandMemberBytes(String key, [int? count]) async {
+    final args = <dynamic>['SRANDMEMBER', key];
+    if (count != null) args.add(count);
+    final res = await sendCommand(args);
+    if (res is Uint8List) return [res];
+    if (res is List) return res.map(Decoders.bytes).toList(growable: false);
+    if (res != null) return [Decoders.bytes(res)];
+    return const [];
   }
 
   /// Moves [member] from [source] to [destination].
@@ -78,6 +109,13 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Returns the raw set difference of all [keys].
+  Future<List<Uint8List>> sDiffBytes(List<String> keys) async {
+    final res = await sendCommand(['SDIFF', ...keys]);
+    if (res is! List) return const [];
+    return res.map(Decoders.bytes).toList(growable: false);
+  }
+
   /// Returns the set intersection of all [keys].
   Future<List<String>> sInter(List<String> keys) async {
     final res = await sendCommand(['SINTER', ...keys]);
@@ -85,11 +123,25 @@ mixin RedisSetCommands on RedisCommandExecutor {
     return [];
   }
 
+  /// Returns the raw set intersection of all [keys].
+  Future<List<Uint8List>> sInterBytes(List<String> keys) async {
+    final res = await sendCommand(['SINTER', ...keys]);
+    if (res is! List) return const [];
+    return res.map(Decoders.bytes).toList(growable: false);
+  }
+
   /// Returns the set union of all [keys].
   Future<List<String>> sUnion(List<String> keys) async {
     final res = await sendCommand(['SUNION', ...keys]);
     if (res is List) return res.map(Decoders.string).toList();
     return [];
+  }
+
+  /// Returns the raw set union of all [keys].
+  Future<List<Uint8List>> sUnionBytes(List<String> keys) async {
+    final res = await sendCommand(['SUNION', ...keys]);
+    if (res is! List) return const [];
+    return res.map(Decoders.bytes).toList(growable: false);
   }
 
   /// Stores the set difference of [keys] in [destination].
@@ -133,6 +185,28 @@ mixin RedisSetCommands on RedisCommandExecutor {
     if (res is List && res.length == 2 && res[1] is List) {
       final nextCursor = Decoders.toInt(res[0]);
       final items = (res[1] as List).map(Decoders.string).toList();
+      return ScanResult(nextCursor, items);
+    }
+    return const ScanResult(0, []);
+  }
+
+  /// Iterates raw set members stored at [key] starting from [cursor].
+  Future<ScanResult<Uint8List>> sScanBytes(
+    String key,
+    int cursor, {
+    String? match,
+    int? count,
+  }) async {
+    final args = ['SSCAN', key, cursor];
+    if (match != null) args.addAll(['MATCH', match]);
+    if (count != null) args.addAll(['COUNT', count]);
+
+    final res = await sendCommand(args);
+    if (res is List && res.length == 2 && res[1] is List) {
+      final nextCursor = Decoders.toInt(res[0]);
+      final items = (res[1] as List)
+          .map(Decoders.bytes)
+          .toList(growable: false);
       return ScanResult(nextCursor, items);
     }
     return const ScanResult(0, []);
