@@ -117,7 +117,7 @@ mixin RedisHashCommands on RedisCommandExecutor {
   /// Returns the values of [fields] from the hash stored at [key].
   Future<List<String?>> hmGet(String key, List<String> fields) async {
     final res = await sendCommand(['HMGET', key, ...fields]);
-    if (res is List) return res.map((e) => e?.toString()).toList();
+    if (res is List) return res.map(Decoders.toStringOrNull).toList();
     return List.filled(fields.length, null);
   }
 
@@ -126,12 +126,12 @@ mixin RedisHashCommands on RedisCommandExecutor {
     final res = await sendCommand(['HGETALL', key]);
     final map = <String, String>{};
     if (res is Map) {
-      res.forEach((k, v) => map[k.toString()] = v.toString());
+      res.forEach((k, v) => map[Decoders.string(k)] = Decoders.string(v));
       return map;
     }
     if (res is List) {
       for (var i = 0; i < res.length; i += 2) {
-        map[res[i].toString()] = res[i + 1].toString();
+        map[Decoders.string(res[i])] = Decoders.string(res[i + 1]);
       }
     }
     return map;
@@ -286,8 +286,8 @@ mixin RedisHashCommands on RedisCommandExecutor {
   /// Returns random fields from the hash at [key].
   Future<List<String>> hRandFields(String key, int count) async {
     final res = await sendCommand(['HRANDFIELD', key, count]);
-    if (res is List) return res.map((value) => value.toString()).toList();
-    if (res != null) return [res.toString()];
+    if (res is List) return res.map(Decoders.string).toList();
+    if (res != null) return [Decoders.string(res)];
     return const [];
   }
 
@@ -300,7 +300,7 @@ mixin RedisHashCommands on RedisCommandExecutor {
     final map = <String, String?>{};
     if (res is List) {
       for (var i = 0; i < res.length; i += 2) {
-        map[res[i].toString()] = Decoders.toStringOrNull(res[i + 1]);
+        map[Decoders.string(res[i])] = Decoders.toStringOrNull(res[i + 1]);
       }
     }
     return map;
@@ -309,14 +309,14 @@ mixin RedisHashCommands on RedisCommandExecutor {
   /// Returns all field names from the hash stored at [key].
   Future<List<String>> hKeys(String key) async {
     final res = await sendCommand(['HKEYS', key]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
   /// Returns all field values from the hash stored at [key].
   Future<List<String>> hVals(String key) async {
     final res = await sendCommand(['HVALS', key]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -396,11 +396,13 @@ mixin RedisHashCommands on RedisCommandExecutor {
 
     final res = await sendCommand(args);
     if (res is List && res.length == 2 && res[1] is List) {
-      final nextCursor = int.tryParse(res[0].toString()) ?? 0;
+      final nextCursor = Decoders.toInt(res[0]);
       final list = res[1] as List;
       final entries = <MapEntry<String, String>>[];
       for (var i = 0; i < list.length; i += 2) {
-        entries.add(MapEntry(list[i].toString(), list[i + 1].toString()));
+        entries.add(
+          MapEntry(Decoders.string(list[i]), Decoders.string(list[i + 1])),
+        );
       }
       return ScanResult(nextCursor, entries);
     }

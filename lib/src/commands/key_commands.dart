@@ -158,7 +158,7 @@ mixin RedisKeyCommands on RedisCommandExecutor {
   /// Returns all keys matching [pattern].
   Future<List<String>> keys(String pattern) async {
     final res = await sendCommand(['KEYS', pattern]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -362,8 +362,8 @@ mixin RedisKeyCommands on RedisCommandExecutor {
 
     final res = await sendCommand(args);
     if (res is List && res.length == 2 && res[1] is List) {
-      final nextCursor = int.tryParse(res[0].toString()) ?? 0;
-      final items = (res[1] as List).map((e) => e.toString()).toList();
+      final nextCursor = Decoders.toInt(res[0]);
+      final items = (res[1] as List).map(Decoders.string).toList();
       return ScanResult(nextCursor, items);
     }
     return const ScanResult(0, []);

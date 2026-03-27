@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:daredis/src/commands/decoders.dart';
 import 'package:daredis/src/crc16.dart';
 import 'package:daredis/src/exceptions.dart';
 
@@ -72,7 +71,7 @@ class ClusterSlotCache {
       final end = _parseInt(entry[1]);
       final masterInfo = entry[2];
       if (masterInfo is! List || masterInfo.length < 2) continue;
-      final host = masterInfo[0].toString();
+      final host = Decoders.string(masterInfo[0]);
       final port = _parseInt(masterInfo[1]);
       final node = ClusterNodeAddress(host, port);
       for (var slot = start; slot <= end; slot++) {
@@ -103,16 +102,12 @@ class ClusterSlotCache {
 
   int _parseInt(dynamic value) {
     if (value is int) return value;
-    return int.parse(value.toString());
+    return Decoders.toInt(value);
   }
 }
 
 /// Converts a raw Redis key representation to a Dart string.
 String keyToString(dynamic key) {
   if (key == null) return '';
-  if (key is String) return key;
-  if (key is List<int>) {
-    return utf8.decode(key, allowMalformed: true);
-  }
-  return key.toString();
+  return Decoders.string(key);
 }

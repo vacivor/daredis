@@ -24,7 +24,7 @@ mixin RedisSetCommands on RedisCommandExecutor {
   /// Returns all members of the set at [key].
   Future<List<String>> sMembers(String key) async {
     final res = await sendCommand(['SMEMBERS', key]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -50,8 +50,8 @@ mixin RedisSetCommands on RedisCommandExecutor {
   /// Pops one or more random members from the set at [key].
   Future<List<String>> sPop(String key, [int? count]) async {
     final res = await sendCommand(['SPOP', key, ?count]);
-    if (res is List) return res.map((e) => e.toString()).toList();
-    if (res != null) return [res.toString()];
+    if (res is List) return res.map(Decoders.string).toList();
+    if (res != null) return [Decoders.string(res)];
     return [];
   }
 
@@ -60,8 +60,8 @@ mixin RedisSetCommands on RedisCommandExecutor {
     final args = <dynamic>['SRANDMEMBER', key];
     if (count != null) args.add(count);
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
-    if (res != null) return [res.toString()];
+    if (res is List) return res.map(Decoders.string).toList();
+    if (res != null) return [Decoders.string(res)];
     return [];
   }
 
@@ -74,21 +74,21 @@ mixin RedisSetCommands on RedisCommandExecutor {
   /// Returns the set difference of all [keys].
   Future<List<String>> sDiff(List<String> keys) async {
     final res = await sendCommand(['SDIFF', ...keys]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
   /// Returns the set intersection of all [keys].
   Future<List<String>> sInter(List<String> keys) async {
     final res = await sendCommand(['SINTER', ...keys]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
   /// Returns the set union of all [keys].
   Future<List<String>> sUnion(List<String> keys) async {
     final res = await sendCommand(['SUNION', ...keys]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -131,8 +131,8 @@ mixin RedisSetCommands on RedisCommandExecutor {
 
     final res = await sendCommand(args);
     if (res is List && res.length == 2 && res[1] is List) {
-      final nextCursor = int.tryParse(res[0].toString()) ?? 0;
-      final items = (res[1] as List).map((e) => e.toString()).toList();
+      final nextCursor = Decoders.toInt(res[0]);
+      final items = (res[1] as List).map(Decoders.string).toList();
       return ScanResult(nextCursor, items);
     }
     return const ScanResult(0, []);

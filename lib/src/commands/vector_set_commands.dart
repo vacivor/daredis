@@ -65,7 +65,7 @@ class VectorSetGraphLink {
 
 class VectorSetRawEmbedding {
   final String quantizationType;
-  final String data;
+  final Uint8List data;
   final double norm;
   final double? range;
 
@@ -161,7 +161,7 @@ List<VectorSetSimilarityMatch> _vectorSimilarityMatches(
       final nested = entry.value;
       if (nested is Map) {
         return VectorSetSimilarityMatch(
-          entry.key.toString(),
+          Decoders.string(entry.key),
           score: Decoders.toDoubleOrNull(nested['score']),
           attributes: Decoders.toStringOrNull(
             nested['attributes'] ?? nested['attribs'],
@@ -169,7 +169,7 @@ List<VectorSetSimilarityMatch> _vectorSimilarityMatches(
         );
       }
       return VectorSetSimilarityMatch(
-        entry.key.toString(),
+        Decoders.string(entry.key),
         score: withScores ? Decoders.toDoubleOrNull(nested) : null,
         attributes: withAttributes && !withScores
             ? Decoders.toStringOrNull(nested)
@@ -194,7 +194,7 @@ List<VectorSetSimilarityMatch> _vectorSimilarityMatches(
     if (i >= value.length) {
       break;
     }
-    final element = value[i].toString();
+    final element = Decoders.string(value[i]);
     double? score;
     String? attributes;
     if (withScores && i + 1 < value.length) {
@@ -231,14 +231,14 @@ List<List<VectorSetGraphLink>> _vectorGraphLinks(
     }
     if (!withScores) {
       return layer
-          .map((item) => VectorSetGraphLink(item.toString()))
+          .map((item) => VectorSetGraphLink(Decoders.string(item)))
           .toList(growable: false);
     }
     final links = <VectorSetGraphLink>[];
     for (var i = 0; i + 1 < layer.length; i += 2) {
       links.add(
         VectorSetGraphLink(
-          layer[i].toString(),
+          Decoders.string(layer[i]),
           score: Decoders.toDoubleOrNull(layer[i + 1]),
         ),
       );
@@ -302,16 +302,14 @@ mixin RedisVectorSetCommands on RedisCommandExecutor {
 
   /// Returns the `RAW` VEMB payload.
   ///
-  /// The binary blob currently flows through the library's bulk-string native
-  /// decoding and is therefore exposed here as a decoded string.
   Future<VectorSetRawEmbedding?> vEmbRaw(String key, String element) async {
     final res = await sendCommand(['VEMB', key, element, 'RAW']);
     if (res is! List || res.length < 3) {
       return null;
     }
     return VectorSetRawEmbedding(
-      quantizationType: res[0].toString(),
-      data: res[1].toString(),
+      quantizationType: Decoders.string(res[0]),
+      data: Decoders.bytes(res[1]),
       norm: Decoders.toDouble(res[2]),
       range: res.length > 3 ? Decoders.toDoubleOrNull(res[3]) : null,
     );
@@ -355,12 +353,12 @@ mixin RedisVectorSetCommands on RedisCommandExecutor {
     }
     final res = await sendCommand(args);
     if (res is List) {
-      return res.map((item) => item.toString()).toList(growable: false);
+      return res.map(Decoders.string).toList(growable: false);
     }
     if (res == null) {
       return const <String>[];
     }
-    return <String>[res.toString()];
+    return <String>[Decoders.string(res)];
   }
 
   Future<List<String>> vRange(

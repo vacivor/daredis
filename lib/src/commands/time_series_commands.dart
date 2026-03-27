@@ -378,16 +378,19 @@ void _appendTimeSeriesLabelSelection(
 Map<String, String?> _timeSeriesLabels(dynamic value) {
   if (value is Map) {
     return value.map(
-      (key, nestedValue) => MapEntry(key.toString(), nestedValue?.toString()),
+      (key, nestedValue) => MapEntry(
+        Decoders.string(key),
+        nestedValue == null ? null : Decoders.string(nestedValue),
+      ),
     );
   }
   final labels = <String, String?>{};
   if (value is List) {
     for (final entry in value) {
       if (entry is List && entry.isNotEmpty) {
-        final key = entry[0].toString();
+        final key = Decoders.string(entry[0]);
         final nestedValue = entry.length > 1 ? entry[1] : null;
-        labels[key] = nestedValue?.toString();
+        labels[key] = nestedValue == null ? null : Decoders.string(nestedValue);
       }
     }
   }
@@ -417,7 +420,7 @@ List<TimeSeriesSample> _timeSeriesSamples(dynamic value) {
 Map<String, dynamic> _timeSeriesFlatMap(dynamic value) {
   if (value is Map) {
     return value.map(
-      (key, nestedValue) => MapEntry(key.toString(), nestedValue),
+      (key, nestedValue) => MapEntry(Decoders.string(key), nestedValue),
     );
   }
   if (value is! List || value.length.isOdd) {
@@ -427,7 +430,7 @@ Map<String, dynamic> _timeSeriesFlatMap(dynamic value) {
   }
   final map = <String, dynamic>{};
   for (var i = 0; i < value.length; i += 2) {
-    map[value[i].toString()] = value[i + 1];
+    map[Decoders.string(value[i])] = value[i + 1];
   }
   return map;
 }
@@ -467,7 +470,7 @@ TimeSeriesMGetResult _timeSeriesMGetEntry(String key, dynamic value) {
 List<TimeSeriesMGetResult> _timeSeriesMGetResults(dynamic value) {
   if (value is Map) {
     return value.entries
-        .map((entry) => _timeSeriesMGetEntry(entry.key.toString(), entry.value))
+        .map((entry) => _timeSeriesMGetEntry(Decoders.string(entry.key), entry.value))
         .toList(growable: false);
   }
   if (value is! List) {
@@ -476,7 +479,7 @@ List<TimeSeriesMGetResult> _timeSeriesMGetResults(dynamic value) {
   return value
       .whereType<List>()
       .map((entry) => TimeSeriesMGetResult(
-            key: entry[0].toString(),
+            key: Decoders.string(entry[0]),
             labels: entry.length > 1
                 ? _timeSeriesLabels(entry[1])
                 : const <String, String?>{},
@@ -512,7 +515,9 @@ TimeSeriesRangeResult _timeSeriesRangeEntry(String key, dynamic value) {
 List<TimeSeriesRangeResult> _timeSeriesRangeResults(dynamic value) {
   if (value is Map) {
     return value.entries
-        .map((entry) => _timeSeriesRangeEntry(entry.key.toString(), entry.value))
+        .map(
+          (entry) => _timeSeriesRangeEntry(Decoders.string(entry.key), entry.value),
+        )
         .toList(growable: false);
   }
   if (value is! List) {
@@ -521,7 +526,7 @@ List<TimeSeriesRangeResult> _timeSeriesRangeResults(dynamic value) {
   return value
       .whereType<List>()
       .map((entry) => TimeSeriesRangeResult(
-            key: entry[0].toString(),
+            key: Decoders.string(entry[0]),
             labels: entry.length > 1
                 ? _timeSeriesLabels(entry[1])
                 : const <String, String?>{},

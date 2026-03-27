@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
@@ -68,8 +69,17 @@ Future<List<String>> scanAllMatches(
       50,
     ]);
     if (result is List && result.length == 2 && result[1] is List) {
-      cursor = int.tryParse(result[0].toString()) ?? 0;
-      matches.addAll((result[1] as List).map((item) => item.toString()));
+      final nextCursor = result[0];
+      cursor = nextCursor is Uint8List
+          ? int.parse(String.fromCharCodes(nextCursor))
+          : int.parse(nextCursor.toString());
+      matches.addAll(
+        (result[1] as List).map(
+          (item) => item is Uint8List
+              ? String.fromCharCodes(item)
+              : item.toString(),
+        ),
+      );
     } else {
       cursor = 0;
     }

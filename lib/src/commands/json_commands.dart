@@ -13,7 +13,7 @@ class JsonMSetEntry {
 }
 
 dynamic _jsonIntReply(dynamic value) {
-  if (value is List) {
+  if (value is List && value is! Uint8List) {
     return value
         .map((item) => item == null ? null : Decoders.toInt(item))
         .toList(growable: false);
@@ -25,22 +25,22 @@ dynamic _jsonIntReply(dynamic value) {
 }
 
 dynamic _jsonStringReply(dynamic value) {
-  if (value is List) {
+  if (value is List && value is! Uint8List) {
     return value
-        .map((item) => item?.toString())
+        .map((item) => item == null ? null : Decoders.string(item))
         .toList(growable: false);
   }
   return Decoders.toStringOrNull(value);
 }
 
 dynamic _jsonNormalizedReply(dynamic value) {
-  if (value is List) {
+  if (value is List && value is! Uint8List) {
     return value.map(_jsonNormalizedReply).toList(growable: false);
   }
   if (value is Map) {
     return value.map(
       (key, nestedValue) => MapEntry(
-        key.toString(),
+        Decoders.string(key),
         _jsonNormalizedReply(nestedValue),
       ),
     );
@@ -180,7 +180,7 @@ mixin RedisJsonCommands on RedisCommandExecutor {
     final res = await sendCommand(['JSON.MGET', ...keys, path]);
     if (res is List) {
       return res
-          .map((item) => item?.toString())
+          .map((item) => item == null ? null : Decoders.string(item))
           .toList(growable: false);
     }
     return const <String?>[];

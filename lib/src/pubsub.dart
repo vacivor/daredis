@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:daredis/src/commands/decoders.dart';
 import 'package:daredis/src/connect.dart';
 import 'package:daredis/src/exceptions.dart';
 import 'package:daredis/src/pubsub_message.dart';
@@ -265,10 +266,14 @@ class RedisPubSub {
   }
 
   void _handlePubSubFrame(List<dynamic> frame) {
-    final type = frame[0].toString();
+    final type = Decoders.string(frame[0]);
     if (type == 'message') {
       _addMessage(
-        PubSubMessage(type, channel: frame[1].toString(), payload: frame[2]),
+        PubSubMessage(
+          type,
+          channel: Decoders.string(frame[1]),
+          payload: Decoders.string(frame[2]),
+        ),
       );
       return;
     }
@@ -276,16 +281,20 @@ class RedisPubSub {
       _addMessage(
         PubSubMessage(
           type,
-          pattern: frame[1].toString(),
-          channel: frame[2].toString(),
-          payload: frame[3],
+          pattern: Decoders.string(frame[1]),
+          channel: Decoders.string(frame[2]),
+          payload: Decoders.string(frame[3]),
         ),
       );
       return;
     }
     if (type == 'smessage') {
       _addMessage(
-        PubSubMessage(type, channel: frame[1].toString(), payload: frame[2]),
+        PubSubMessage(
+          type,
+          channel: Decoders.string(frame[1]),
+          payload: Decoders.string(frame[2]),
+        ),
       );
       return;
     }
@@ -299,7 +308,7 @@ class RedisPubSub {
       _addMessage(
         PubSubMessage(
           type,
-          channel: frame[1]?.toString(),
+          channel: Decoders.toStringOrNull(frame[1]),
           subscriptionCount: count,
         ),
       );
@@ -514,8 +523,7 @@ class RedisPubSub {
   }
 
   int _parseInt(dynamic value) {
-    if (value is int) return value;
-    return int.tryParse(value.toString()) ?? 0;
+    return Decoders.toIntOrNull(value) ?? 0;
   }
 
   void _addMessage(PubSubMessage message) {
@@ -539,7 +547,7 @@ class RedisPubSub {
     );
 
     for (final command in commands) {
-      final commandName = command.first.toString().toUpperCase();
+      final commandName = Decoders.string(command.first).toUpperCase();
       final ackType = switch (commandName) {
         'SUBSCRIBE' => 'subscribe',
         'PSUBSCRIBE' => 'psubscribe',

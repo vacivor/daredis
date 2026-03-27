@@ -1,6 +1,7 @@
 import 'package:daredis/src/cluster_command_policy.dart';
 import 'package:daredis/src/cluster_redirect.dart';
 import 'package:daredis/src/cluster_slots.dart';
+import 'package:daredis/src/commands/decoders.dart';
 import 'package:daredis/src/exceptions.dart';
 
 import '../daredis.dart';
@@ -603,7 +604,7 @@ class _DaredisClusterConnection extends RedisClusterClient {
         try {
           await connection.ensureConnected();
           final res = await connection.sendCommand(['PING']);
-          final text = res?.toString();
+          final text = Decoders.toStringOrNull(res);
           return text == 'PONG' || text == 'OK';
         } catch (_) {
           return false;

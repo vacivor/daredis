@@ -1,4 +1,5 @@
 import '../daredis.dart';
+import 'commands/decoders.dart';
 
 /// Standalone Redis client backed by a reusable connection pool.
 class Daredis extends RedisClient
@@ -67,7 +68,7 @@ class Daredis extends RedisClient
            try {
              await connection.ensureConnected();
              final res = await connection.sendCommand(['PING']);
-             final text = res?.toString();
+             final text = Decoders.toStringOrNull(res);
              return text == 'PONG' || text == 'OK';
            } catch (_) {
              return false;

@@ -50,7 +50,7 @@ mixin RedisGeoCommands on RedisCommandExecutor {
 
   Future<List<String?>> geoHash(String key, List<String> members) async {
     final res = await sendCommand(['GEOHASH', key, ...members]);
-    if (res is List) return res.map((e) => e?.toString()).toList();
+    if (res is List) return res.map(Decoders.toStringOrNull).toList();
     return [];
   }
 
@@ -59,7 +59,7 @@ mixin RedisGeoCommands on RedisCommandExecutor {
     if (res is List) {
       return res.map((e) {
         if (e is List && e.length == 2) {
-          return [double.parse(e[0].toString()), double.parse(e[1].toString())];
+          return [Decoders.toDouble(e[0]), Decoders.toDouble(e[1])];
         }
         return null;
       }).toList();
@@ -77,16 +77,16 @@ mixin RedisGeoCommands on RedisCommandExecutor {
     if (res is List) {
       return res.map((item) {
         if (item is List) {
-          var member = item[0].toString();
+          var member = Decoders.string(item[0]);
           double? dist;
           List<double>? coords;
           int? hash;
           int idx = 1;
-          if (withDist) dist = double.parse(item[idx++].toString());
-          if (withHash) hash = int.parse(item[idx++].toString());
+          if (withDist) dist = Decoders.toDouble(item[idx++]);
+          if (withHash) hash = Decoders.toInt(item[idx++]);
           if (withCoord) {
             final coordList = item[idx++] as List;
-            coords = coordList.map((e) => double.parse(e.toString())).toList();
+            coords = coordList.map(Decoders.toDouble).toList();
           }
           return GeoRadiusResult(
             member,
@@ -95,7 +95,7 @@ mixin RedisGeoCommands on RedisCommandExecutor {
             hash: hash,
           );
         } else {
-          return GeoRadiusResult(item.toString());
+          return GeoRadiusResult(Decoders.string(item));
         }
       }).toList();
     }
@@ -206,7 +206,7 @@ mixin RedisGeoCommands on RedisCommandExecutor {
 
   Future<List<String>> geoSearch(List<dynamic> args) async {
     final res = await sendCommand(['GEOSEARCH', ...args]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 

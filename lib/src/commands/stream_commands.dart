@@ -34,10 +34,10 @@ class StreamGroupInfo {
   factory StreamGroupInfo.fromReply(dynamic reply) {
     final map = _streamReplyAsMap(reply);
     return StreamGroupInfo(
-      name: map['name']?.toString() ?? '',
-      consumers: int.tryParse(map['consumers']?.toString() ?? '0') ?? 0,
-      pending: int.tryParse(map['pending']?.toString() ?? '0') ?? 0,
-      lastDeliveredId: map['last-delivered-id']?.toString(),
+      name: Decoders.toStringOrNull(map['name']) ?? '',
+      consumers: Decoders.toIntOrNull(map['consumers']) ?? 0,
+      pending: Decoders.toIntOrNull(map['pending']) ?? 0,
+      lastDeliveredId: Decoders.toStringOrNull(map['last-delivered-id']),
       raw: map,
     );
   }
@@ -59,9 +59,9 @@ class StreamConsumerInfo {
   factory StreamConsumerInfo.fromReply(dynamic reply) {
     final map = _streamReplyAsMap(reply);
     return StreamConsumerInfo(
-      name: map['name']?.toString() ?? '',
-      pending: int.tryParse(map['pending']?.toString() ?? '0') ?? 0,
-      idle: int.tryParse(map['idle']?.toString() ?? '0') ?? 0,
+      name: Decoders.toStringOrNull(map['name']) ?? '',
+      pending: Decoders.toIntOrNull(map['pending']) ?? 0,
+      idle: Decoders.toIntOrNull(map['idle']) ?? 0,
       raw: map,
     );
   }
@@ -105,17 +105,17 @@ class StreamInfo {
   factory StreamInfo.fromReply(dynamic reply) {
     final map = _streamReplyAsMap(reply);
     return StreamInfo(
-      length: int.tryParse(map['length']?.toString() ?? '0') ?? 0,
-      radixTreeKeys: int.tryParse(map['radix-tree-keys']?.toString() ?? ''),
-      radixTreeNodes: int.tryParse(map['radix-tree-nodes']?.toString() ?? ''),
-      groups: int.tryParse(map['groups']?.toString() ?? ''),
-      lastGeneratedIdMs: int.tryParse(
-        map['last-generated-id-ms']?.toString() ?? '',
+      length: Decoders.toIntOrNull(map['length']) ?? 0,
+      radixTreeKeys: Decoders.toIntOrNull(map['radix-tree-keys']),
+      radixTreeNodes: Decoders.toIntOrNull(map['radix-tree-nodes']),
+      groups: Decoders.toIntOrNull(map['groups']),
+      lastGeneratedIdMs: Decoders.toIntOrNull(map['last-generated-id-ms']),
+      lastGeneratedId: Decoders.toStringOrNull(map['last-generated-id']),
+      maxDeletedEntryId: Decoders.toStringOrNull(map['max-deleted-entry-id']),
+      entriesAdded: Decoders.toStringOrNull(map['entries-added']),
+      recordedFirstEntryId: Decoders.toStringOrNull(
+        map['recorded-first-entry-id'],
       ),
-      lastGeneratedId: map['last-generated-id']?.toString(),
-      maxDeletedEntryId: map['max-deleted-entry-id']?.toString(),
-      entriesAdded: map['entries-added']?.toString(),
-      recordedFirstEntryId: map['recorded-first-entry-id']?.toString(),
       raw: map,
     );
   }
@@ -124,13 +124,13 @@ class StreamInfo {
 Map<String, dynamic> _streamReplyAsMap(dynamic value) {
   if (value is Map) {
     return value.map(
-      (key, nestedValue) => MapEntry(key.toString(), nestedValue),
+      (key, nestedValue) => MapEntry(Decoders.string(key), nestedValue),
     );
   }
-  if (value is List && value.length.isEven) {
+  if (value is List && value is! Uint8List && value.length.isEven) {
     final map = <String, dynamic>{};
     for (var i = 0; i < value.length; i += 2) {
-      map[value[i].toString()] = value[i + 1];
+      map[Decoders.string(value[i])] = value[i + 1];
     }
     return map;
   }
@@ -175,7 +175,7 @@ mixin RedisStreamCommands on RedisCommandExecutor {
 
     fields.forEach((k, v) => args.addAll([k, v]));
     final res = await sendCommand(args);
-    return res.toString();
+    return Decoders.string(res);
   }
 
   Future<List<StreamMessage>> xRange(
@@ -352,14 +352,14 @@ mixin RedisStreamCommands on RedisCommandExecutor {
       if (res[3] is List) {
         for (var item in res[3]) {
           if (item is List && item.length == 2) {
-            consumers[item[0].toString()] = int.parse(item[1].toString());
+            consumers[Decoders.string(item[0])] = Decoders.toInt(item[1]);
           }
         }
       }
       return StreamPendingInfo(
-        int.parse(res[0].toString()),
-        lowerId: res[1]?.toString(),
-        higherId: res[2]?.toString(),
+        Decoders.toInt(res[0]),
+        lowerId: Decoders.toStringOrNull(res[1]),
+        higherId: Decoders.toStringOrNull(res[2]),
         consumers: consumers.isNotEmpty ? consumers : null,
       );
     }
@@ -511,12 +511,13 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     if (res is List) {
       return res.map((item) {
         if (item is List && item.length == 2) {
-          final id = item[0].toString();
+          final id = Decoders.string(item[0]);
           final fields = <String, String>{};
           if (item[1] is List) {
             for (var i = 0; i < (item[1] as List).length; i += 2) {
-              fields[(item[1] as List)[i].toString()] = (item[1] as List)[i + 1]
-                  .toString();
+              fields[Decoders.string((item[1] as List)[i])] = Decoders.string(
+                (item[1] as List)[i + 1],
+              );
             }
           }
           return StreamMessage(id, fields);
@@ -532,7 +533,7 @@ mixin RedisStreamCommands on RedisCommandExecutor {
     if (res is List) {
       for (var streamItem in res) {
         if (streamItem is List && streamItem.length == 2) {
-          final key = streamItem[0].toString();
+          final key = Decoders.string(streamItem[0]);
           final messages = _parseStreamList(streamItem[1]);
           result.add({key: messages});
         }

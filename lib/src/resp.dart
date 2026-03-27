@@ -173,7 +173,7 @@ dynamic respValueToNative(RespValue? value, {bool allowMalformed = true}) {
   if (value is RespBigNumber) return value.value;
   if (value is RespBoolean) return value.value;
   if (value is RespBulkString) {
-    return value.asString(allowMalformed: allowMalformed);
+    return Uint8List.fromList(value.bytes);
   }
   if (value is RespArray) {
     return value.items
@@ -210,7 +210,7 @@ dynamic respValueToNative(RespValue? value, {bool allowMalformed = true}) {
         .toList();
   }
   if (value is RespChunkedString) {
-    return utf8.decode(value.concatBytes(), allowMalformed: allowMalformed);
+    return value.concatBytes();
   }
   throw RespException('Unsupported RESP value: ${value.runtimeType}');
 }

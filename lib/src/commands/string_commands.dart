@@ -71,9 +71,9 @@ mixin RedisStringCommands on RedisCommandExecutor {
     bool? nx,
     bool? xx,
   }) async {
-    final args = ['SET', key, value, 'GET'];
-    if (ex != null) args.addAll(['EX', ex.toString()]);
-    if (px != null) args.addAll(['PX', px.toString()]);
+    final args = <dynamic>['SET', key, value, 'GET'];
+    if (ex != null) args.addAll(['EX', ex]);
+    if (px != null) args.addAll(['PX', px]);
     if (nx == true) args.add('NX');
     if (xx == true) args.add('XX');
 
@@ -95,9 +95,9 @@ mixin RedisStringCommands on RedisCommandExecutor {
     bool? nx,
     bool? xx,
   }) async {
-    final args = ['GETEX', key];
-    if (ex != null) args.addAll(['EX', ex.toString()]);
-    if (px != null) args.addAll(['PX', px.toString()]);
+    final args = <dynamic>['GETEX', key];
+    if (ex != null) args.addAll(['EX', ex]);
+    if (px != null) args.addAll(['PX', px]);
     if (nx == true) args.add('NX');
     if (xx == true) args.add('XX');
 
@@ -126,7 +126,7 @@ mixin RedisStringCommands on RedisCommandExecutor {
   /// Returns the values for all [keys] in request order.
   Future<List<String?>> mGet(List<String> keys) async {
     final res = await sendCommand(['MGET', ...keys]);
-    if (res is List) return res.map((e) => e?.toString()).toList();
+    if (res is List) return res.map(Decoders.toStringOrNull).toList();
     return [];
   }
 
@@ -208,9 +208,9 @@ mixin RedisStringCommands on RedisCommandExecutor {
 
   /// Counts set bits in [key], optionally within the `[start, end]` range.
   Future<int> bitCount(String key, {int? start, int? end}) async {
-    final args = ['BITCOUNT', key];
+    final args = <dynamic>['BITCOUNT', key];
     if (start != null && end != null) {
-      args.addAll([start.toString(), end.toString()]);
+      args.addAll([start, end]);
     }
     final res = await sendCommand(args);
     return Decoders.toInt(res);

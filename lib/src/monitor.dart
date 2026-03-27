@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:daredis/src/commands/decoders.dart';
 import 'package:daredis/src/connect.dart';
 import 'package:daredis/src/exceptions.dart';
 import 'package:daredis/src/resp.dart';
@@ -117,7 +118,7 @@ class RedisMonitor {
 
       _monitoring = true;
       final response = await _sendCommand(['MONITOR']);
-      if (response?.toString() != 'OK') {
+      if (Decoders.toStringOrNull(response) != 'OK') {
         _monitoring = false;
         throw DaredisProtocolException(
           'Unexpected MONITOR reply: ${response.runtimeType}',
@@ -217,7 +218,7 @@ class RedisMonitor {
           continue;
         }
         if (_monitoring && native != null) {
-          _addMessage(native.toString());
+          _addMessage(Decoders.string(native));
         }
       } on IncompleteDataException {
         break;
@@ -234,7 +235,7 @@ class RedisMonitor {
   /// RESP frames outside of [RedisMonitor].
   void handleFrame(dynamic frame) {
     if (frame != null) {
-      _addMessage(frame.toString());
+      _addMessage(Decoders.string(frame));
     }
   }
 

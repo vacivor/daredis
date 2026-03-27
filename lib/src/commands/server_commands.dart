@@ -36,26 +36,26 @@ class RedisCommandInfoEntry {
 
     final flags = <String>[];
     if (reply.length > 2 && reply[2] is List) {
-      flags.addAll((reply[2] as List).map((value) => value.toString()));
+      flags.addAll((reply[2] as List).map(Decoders.string));
     }
 
     final categories = <String>[];
     if (reply.length > 6 && reply[6] is List) {
-      categories.addAll((reply[6] as List).map((value) => value.toString()));
+      categories.addAll((reply[6] as List).map(Decoders.string));
     }
 
     final tips = <String>[];
     if (reply.length > 7 && reply[7] is List) {
-      tips.addAll((reply[7] as List).map((value) => value.toString()));
+      tips.addAll((reply[7] as List).map(Decoders.string));
     }
 
     return RedisCommandInfoEntry(
-      name: reply[0].toString(),
-      arity: int.parse(reply[1].toString()),
+      name: Decoders.string(reply[0]),
+      arity: Decoders.toInt(reply[1]),
       flags: flags,
-      firstKey: reply.length > 3 ? int.parse(reply[3].toString()) : 0,
-      lastKey: reply.length > 4 ? int.parse(reply[4].toString()) : 0,
-      keyStep: reply.length > 5 ? int.parse(reply[5].toString()) : 0,
+      firstKey: reply.length > 3 ? Decoders.toInt(reply[3]) : 0,
+      lastKey: reply.length > 4 ? Decoders.toInt(reply[4]) : 0,
+      keyStep: reply.length > 5 ? Decoders.toInt(reply[5]) : 0,
       categories: categories,
       tips: tips,
       keySpecifications: reply.length > 8 && reply[8] is List
@@ -93,10 +93,10 @@ class RedisCommandDocArgument {
   factory RedisCommandDocArgument.fromReply(dynamic reply) {
     final map = _serverReplyAsMap(reply);
     return RedisCommandDocArgument(
-      name: map['name']?.toString() ?? '',
-      type: map['type']?.toString(),
-      displayText: map['display_text']?.toString(),
-      token: map['token']?.toString(),
+      name: Decoders.toStringOrNull(map['name']) ?? '',
+      type: Decoders.toStringOrNull(map['type']),
+      displayText: Decoders.toStringOrNull(map['display_text']),
+      token: Decoders.toStringOrNull(map['token']),
       optional: Decoders.toBoolOrNull(map['optional']) ?? false,
       multiple: Decoders.toBoolOrNull(map['multiple']) ?? false,
       arguments: map['arguments'] is List
@@ -135,9 +135,9 @@ class RedisCommandDoc {
         : const <RedisCommandDocArgument>[];
     return RedisCommandDoc(
       name: name,
-      summary: map['summary']?.toString(),
-      since: map['since']?.toString(),
-      group: map['group']?.toString(),
+      summary: Decoders.toStringOrNull(map['summary']),
+      since: Decoders.toStringOrNull(map['since']),
+      group: Decoders.toStringOrNull(map['group']),
       arguments: arguments,
       raw: map,
     );
@@ -160,11 +160,11 @@ class RedisFunctionDefinition {
   factory RedisFunctionDefinition.fromReply(dynamic reply) {
     final map = _serverReplyAsMap(reply);
     final flags = map['flags'] is List
-        ? (map['flags'] as List).map((value) => value.toString()).toList()
+        ? (map['flags'] as List).map(Decoders.string).toList()
         : const <String>[];
     return RedisFunctionDefinition(
-      name: map['name']?.toString() ?? '',
-      description: map['description']?.toString(),
+      name: Decoders.toStringOrNull(map['name']) ?? '',
+      description: Decoders.toStringOrNull(map['description']),
       flags: flags,
       raw: map,
     );
@@ -189,9 +189,9 @@ class RedisFunctionLibrary {
   factory RedisFunctionLibrary.fromReply(dynamic reply) {
     final map = _serverReplyAsMap(reply);
     return RedisFunctionLibrary(
-      libraryName: map['library_name']?.toString() ?? '',
-      engine: map['engine']?.toString(),
-      code: map['library_code']?.toString(),
+      libraryName: Decoders.toStringOrNull(map['library_name']) ?? '',
+      engine: Decoders.toStringOrNull(map['engine']),
+      code: Decoders.toStringOrNull(map['library_code']),
       functions: map['functions'] is List
           ? (map['functions'] as List)
               .map((value) => RedisFunctionDefinition.fromReply(value))
@@ -221,8 +221,8 @@ class RedisFunctionStats {
     final engines = map['engines'] is Map
         ? (map['engines'] as Map).map(
             (key, value) => MapEntry(
-              key.toString(),
-              RedisFunctionEngineStats.fromReply(key.toString(), value),
+              Decoders.string(key),
+              RedisFunctionEngineStats.fromReply(Decoders.string(key), value),
             ),
           )
         : <String, RedisFunctionEngineStats>{};
@@ -252,9 +252,9 @@ class RedisRunningFunction {
   factory RedisRunningFunction.fromReply(dynamic reply) {
     final map = _serverReplyAsMap(reply);
     return RedisRunningFunction(
-      libraryName: map['library_name']?.toString(),
-      functionName: map['name']?.toString(),
-      command: map['command']?.toString(),
+      libraryName: Decoders.toStringOrNull(map['library_name']),
+      functionName: Decoders.toStringOrNull(map['name']),
+      command: Decoders.toStringOrNull(map['command']),
       durationMs: Decoders.toDoubleOrNull(map['duration_ms']),
       raw: map,
     );
@@ -310,7 +310,7 @@ class RedisRoleInfo {
     if (reply is! List || reply.isEmpty) {
       throw DaredisProtocolException('Unexpected ROLE reply: $reply');
     }
-    final role = reply.first.toString();
+    final role = Decoders.string(reply.first);
     if (role == 'master') {
       final replicas = reply.length > 2 && reply[2] is List
           ? (reply[2] as List)
@@ -325,7 +325,7 @@ class RedisRoleInfo {
         primaryPort: null,
         replicationState: null,
         replicationOffset: reply.length > 1
-            ? int.tryParse(reply[1].toString())
+            ? Decoders.toIntOrNull(reply[1])
             : null,
         replicas: replicas,
         monitoredMasters: const [],
@@ -335,11 +335,13 @@ class RedisRoleInfo {
       return RedisRoleInfo(
         role: role,
         raw: List<dynamic>.from(reply),
-        primaryHost: reply.length > 1 ? reply[1].toString() : null,
-        primaryPort: reply.length > 2 ? int.tryParse(reply[2].toString()) : null,
-        replicationState: reply.length > 3 ? reply[3].toString() : null,
+        primaryHost: reply.length > 1 ? Decoders.toStringOrNull(reply[1]) : null,
+        primaryPort: reply.length > 2 ? Decoders.toIntOrNull(reply[2]) : null,
+        replicationState: reply.length > 3
+            ? Decoders.toStringOrNull(reply[3])
+            : null,
         replicationOffset: reply.length > 4
-            ? int.tryParse(reply[4].toString())
+            ? Decoders.toIntOrNull(reply[4])
             : null,
         replicas: const [],
         monitoredMasters: const [],
@@ -353,7 +355,7 @@ class RedisRoleInfo {
       replicationState: null,
       replicationOffset: null,
       replicas: const [],
-      monitoredMasters: reply.skip(1).map((value) => value.toString()).toList(),
+      monitoredMasters: reply.skip(1).map(Decoders.string).toList(),
     );
   }
 }
@@ -407,31 +409,36 @@ class RedisRoleReplica {
       throw DaredisProtocolException('Unexpected ROLE replica reply: $reply');
     }
     return RedisRoleReplica(
-      host: reply[0].toString(),
-      port: int.parse(reply[1].toString()),
-      offset: int.parse(reply[2].toString()),
+      host: Decoders.string(reply[0]),
+      port: Decoders.toInt(reply[1]),
+      offset: Decoders.toInt(reply[2]),
     );
   }
 }
 
 dynamic _normalizeServerReply(dynamic value) {
+  if (value is Uint8List) {
+    return Decoders.string(value);
+  }
   if (value is Map) {
     return value.map(
       (key, nestedValue) =>
-          MapEntry(key.toString(), _normalizeServerReply(nestedValue)),
+          MapEntry(Decoders.string(key), _normalizeServerReply(nestedValue)),
     );
   }
-  if (value is List) {
+  if (value is List && value is! Uint8List) {
     final normalized = value.map(_normalizeServerReply).toList();
     final isPairList = normalized.length.isEven &&
-        normalized
-            .asMap()
-            .entries
-            .every((entry) => entry.key.isOdd || entry.value is! List);
+        normalized.asMap().entries.every(
+          (entry) =>
+              entry.key.isOdd ||
+              entry.value is String ||
+              entry.value is Uint8List,
+        );
     if (isPairList) {
       final map = <String, dynamic>{};
       for (var i = 0; i < normalized.length; i += 2) {
-        map[normalized[i].toString()] = normalized[i + 1];
+        map[Decoders.string(normalized[i])] = normalized[i + 1];
       }
       return map;
     }
@@ -750,8 +757,8 @@ mixin RedisAdminCommands on RedisCommandExecutor {
     if (res is! List) return const [];
     return res.whereType<List>().map((entry) {
       return RedisLatencySample(
-        timestamp: int.parse(entry[0].toString()),
-        latencyMilliseconds: int.parse(entry[1].toString()),
+        timestamp: Decoders.toInt(entry[0]),
+        latencyMilliseconds: Decoders.toInt(entry[1]),
       );
     }).toList(growable: false);
   }
@@ -761,10 +768,10 @@ mixin RedisAdminCommands on RedisCommandExecutor {
     if (res is! List) return const [];
     return res.whereType<List>().map((entry) {
       return RedisLatencyLatestEvent(
-        event: entry[0].toString(),
-        timestamp: int.parse(entry[1].toString()),
-        latestLatencyMilliseconds: int.parse(entry[2].toString()),
-        maxLatencyMilliseconds: int.parse(entry[3].toString()),
+        event: Decoders.string(entry[0]),
+        timestamp: Decoders.toInt(entry[1]),
+        latestLatencyMilliseconds: Decoders.toInt(entry[2]),
+        maxLatencyMilliseconds: Decoders.toInt(entry[3]),
       );
     }).toList(growable: false);
   }
@@ -1054,8 +1061,8 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
     if (res is! List) return const [];
     return res.whereType<List>().map((entry) {
       return RedisLatencySample(
-        timestamp: int.parse(entry[0].toString()),
-        latencyMilliseconds: int.parse(entry[1].toString()),
+        timestamp: Decoders.toInt(entry[0]),
+        latencyMilliseconds: Decoders.toInt(entry[1]),
       );
     }).toList(growable: false);
   }
@@ -1065,10 +1072,10 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
     if (res is! List) return const [];
     return res.whereType<List>().map((entry) {
       return RedisLatencyLatestEvent(
-        event: entry[0].toString(),
-        timestamp: int.parse(entry[1].toString()),
-        latestLatencyMilliseconds: int.parse(entry[2].toString()),
-        maxLatencyMilliseconds: int.parse(entry[3].toString()),
+        event: Decoders.string(entry[0]),
+        timestamp: Decoders.toInt(entry[1]),
+        latestLatencyMilliseconds: Decoders.toInt(entry[2]),
+        maxLatencyMilliseconds: Decoders.toInt(entry[3]),
       );
     }).toList(growable: false);
   }
@@ -1129,14 +1136,15 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
 
   Future<List<String>> aclList() async {
     final res = await sendCommand(['ACL', 'LIST']);
-    if (res is List) return res.map((e) => e.toString()).toList();
-    if (res is String) return res.split('\n');
+    if (res is List) return res.map(Decoders.string).toList();
+    final text = Decoders.toStringOrNull(res);
+    if (text != null) return text.split('\n');
     return [];
   }
 
   Future<List<String>> aclUsers() async {
     final res = await sendCommand(['ACL', 'USERS']);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -1144,7 +1152,7 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
     final args = <dynamic>['ACL', 'CAT'];
     if (category != null) args.add(category);
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -1247,13 +1255,13 @@ mixin RedisServerCommands on RedisCommandExecutor {
     final res = await sendCommand(['CONFIG', 'GET', parameter]);
     if (res is Map) {
       return res.map(
-        (key, value) => MapEntry(key.toString(), value.toString()),
+        (key, value) => MapEntry(Decoders.string(key), Decoders.string(value)),
       );
     }
     if (res is List && res.length % 2 == 0) {
       final map = <String, String>{};
       for (var i = 0; i < res.length; i += 2) {
-        map[res[i].toString()] = res[i + 1].toString();
+        map[Decoders.string(res[i])] = Decoders.string(res[i + 1]);
       }
       return map;
     }
@@ -1357,7 +1365,7 @@ mixin RedisServerCommands on RedisCommandExecutor {
   Future<List<int>> time() async {
     final res = await sendCommand(['TIME']);
     if (res is List && res.length == 2) {
-      return [int.parse(res[0].toString()), int.parse(res[1].toString())];
+      return [Decoders.toInt(res[0]), Decoders.toInt(res[1])];
     }
     return [];
   }
@@ -1378,7 +1386,7 @@ mixin RedisServerCommands on RedisCommandExecutor {
     final args = ['PUBSUB', 'CHANNELS'];
     if (pattern != null) args.add(pattern);
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -1387,7 +1395,7 @@ mixin RedisServerCommands on RedisCommandExecutor {
     if (res is List && res.length % 2 == 0) {
       final map = <String, int>{};
       for (var i = 0; i < res.length; i += 2) {
-        map[res[i].toString()] = int.parse(res[i + 1].toString());
+        map[Decoders.string(res[i])] = Decoders.toInt(res[i + 1]);
       }
       return map;
     }
@@ -1408,7 +1416,7 @@ mixin RedisServerCommands on RedisCommandExecutor {
     final args = ['PUBSUB', 'SHARDCHANNELS'];
     if (pattern != null) args.add(pattern);
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -1417,7 +1425,7 @@ mixin RedisServerCommands on RedisCommandExecutor {
     if (res is List && res.length % 2 == 0) {
       final map = <String, int>{};
       for (var i = 0; i < res.length; i += 2) {
-        map[res[i].toString()] = int.parse(res[i + 1].toString());
+        map[Decoders.string(res[i])] = Decoders.toInt(res[i + 1]);
       }
       return map;
     }
@@ -1471,14 +1479,15 @@ mixin RedisServerCommands on RedisCommandExecutor {
 
   Future<List<String>> aclList() async {
     final res = await sendCommand(['ACL', 'LIST']);
-    if (res is List) return res.map((e) => e.toString()).toList();
-    if (res is String) return res.split('\n');
+    if (res is List) return res.map(Decoders.string).toList();
+    final text = Decoders.toStringOrNull(res);
+    if (text != null) return text.split('\n');
     return [];
   }
 
   Future<List<String>> aclUsers() async {
     final res = await sendCommand(['ACL', 'USERS']);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -1486,7 +1495,7 @@ mixin RedisServerCommands on RedisCommandExecutor {
     final args = <dynamic>['ACL', 'CAT'];
     if (category != null) args.add(category);
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 

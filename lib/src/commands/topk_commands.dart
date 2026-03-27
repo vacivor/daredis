@@ -112,14 +112,14 @@ mixin RedisTopKCommands on RedisCommandExecutor {
     }
     if (!withCount) {
       return res
-          .map((value) => TopKEntry(value.toString()))
+          .map((value) => TopKEntry(Decoders.string(value)))
           .toList(growable: false);
     }
     final entries = <TopKEntry>[];
     for (var i = 0; i + 1 < res.length; i += 2) {
       entries.add(
         TopKEntry(
-          res[i].toString(),
+          Decoders.string(res[i]),
           count: Decoders.toInt(res[i + 1]),
         ),
       );

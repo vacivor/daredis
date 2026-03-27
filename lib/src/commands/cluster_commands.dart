@@ -21,8 +21,8 @@ class ClusterSlotRange {
         'Unexpected CLUSTER SLOTS entry: $reply',
       );
     }
-    final start = int.parse(reply[0].toString());
-    final end = int.parse(reply[1].toString());
+    final start = Decoders.toInt(reply[0]);
+    final end = Decoders.toInt(reply[1]);
     final primary = _clusterNodeAddressFromReply(reply[2]);
     final replicas = <ClusterNodeAddress>[];
     for (final node in reply.skip(3)) {
@@ -61,8 +61,8 @@ ClusterNodeAddress _clusterNodeAddressFromReply(dynamic reply) {
     throw DaredisProtocolException('Unexpected cluster node reply: $reply');
   }
   return ClusterNodeAddress(
-    reply[0].toString(),
-    int.parse(reply[1].toString()),
+    Decoders.string(reply[0]),
+    Decoders.toInt(reply[1]),
   );
 }
 
@@ -73,7 +73,7 @@ Map<String, dynamic> _normalizeClusterShard(Map<String, dynamic> shard) {
     normalized['slots'] = slots.map((entry) {
       if (entry is Map && entry.length == 1) {
         final pair = entry.entries.first;
-        return [int.parse(pair.key), pair.value];
+        return [Decoders.toInt(pair.key), pair.value];
       }
       return entry;
     }).toList(growable: false);
@@ -154,7 +154,7 @@ mixin RedisClusterCommands on RedisClusterClient {
 
   Future<List<String>> clusterGetKeysInSlot(int slot, int count) async {
     final res = await sendCommand(['CLUSTER', 'GETKEYSINSLOT', slot, count]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -229,7 +229,7 @@ mixin RedisClusterCommands on RedisClusterClient {
   Future<List<String>> clusterReplicas(String nodeId) async {
     final res = await sendCommand(['CLUSTER', 'REPLICAS', nodeId]);
     if (res is List) {
-      return res.map((value) => value.toString()).toList(growable: false);
+      return res.map(Decoders.string).toList(growable: false);
     }
     return const [];
   }
@@ -237,7 +237,7 @@ mixin RedisClusterCommands on RedisClusterClient {
   Future<List<String>> clusterSlaves(String nodeId) async {
     final res = await sendCommand(['CLUSTER', 'SLAVES', nodeId]);
     if (res is List) {
-      return res.map((value) => value.toString()).toList(growable: false);
+      return res.map(Decoders.string).toList(growable: false);
     }
     return const [];
   }

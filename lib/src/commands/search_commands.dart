@@ -332,7 +332,8 @@ void _appendSearchParams(
 Map<String, dynamic> _searchFlatMap(dynamic value) {
   if (value is Map) {
     return value.map(
-      (key, nestedValue) => MapEntry(key.toString(), _normalizeServerReply(nestedValue)),
+      (key, nestedValue) =>
+          MapEntry(Decoders.string(key), _normalizeServerReply(nestedValue)),
     );
   }
   return _serverReplyAsMap(value);
@@ -347,9 +348,9 @@ SearchResult _parseSearchResult(dynamic value, SearchQueryOptions options) {
     if (results is List) {
       final documents = results.map((entry) {
         final map = _searchFlatMap(entry);
-        final id = map['id']?.toString() ??
-            map['keyid']?.toString() ??
-            map['__key']?.toString() ??
+        final id = Decoders.toStringOrNull(map['id']) ??
+            Decoders.toStringOrNull(map['keyid']) ??
+            Decoders.toStringOrNull(map['__key']) ??
             '';
         final fields = map['extra_attributes'] is Map
             ? Map<String, dynamic>.from(map['extra_attributes'] as Map)
@@ -377,7 +378,7 @@ SearchResult _parseSearchResult(dynamic value, SearchQueryOptions options) {
   final documents = <SearchDocument>[];
   var index = 1;
   while (index < value.length) {
-    final id = value[index++].toString();
+    final id = Decoders.string(value[index++]);
     double? score;
     String? payload;
     String? sortKey;
@@ -414,7 +415,7 @@ SearchAggregateResult _parseSearchAggregateResult(dynamic value) {
   if (value is List &&
       value.length == 2 &&
       value[0] is List &&
-      (value[1] is int || int.tryParse(value[1].toString()) != null)) {
+      Decoders.toIntOrNull(value[1]) != null) {
     return SearchAggregateResult(
       results: _normalizeServerReply(value[0]),
       cursorId: Decoders.toInt(value[1]),
@@ -439,7 +440,7 @@ List<SearchSpellCheckTermResult> _parseSpellCheckResults(dynamic value) {
           suggestions.add(
             SearchSpellCheckSuggestion(
               Decoders.toDouble(suggestion[0]),
-              suggestion[1].toString(),
+              Decoders.string(suggestion[1]),
             ),
           );
         }
@@ -447,7 +448,7 @@ List<SearchSpellCheckTermResult> _parseSpellCheckResults(dynamic value) {
     }
     results.add(
       SearchSpellCheckTermResult(
-        term: item[1].toString(),
+        term: Decoders.string(item[1]),
         suggestions: suggestions,
       ),
     );
@@ -463,10 +464,10 @@ Map<String, List<String>> _parseSynDump(dynamic value) {
   for (var i = 0; i + 1 < value.length; i += 2) {
     final groups = value[i + 1] is List
         ? (value[i + 1] as List)
-            .map((entry) => entry.toString())
+            .map(Decoders.string)
             .toList(growable: false)
         : const <String>[];
-    result[value[i].toString()] = groups;
+    result[Decoders.string(value[i])] = groups;
   }
   return result;
 }
@@ -605,7 +606,7 @@ mixin RedisSearchCommands on RedisCommandExecutor {
     final res = await sendCommand(['FT.CONFIG', 'GET', option]);
     if (res is Map) {
       return res.map(
-        (key, value) => MapEntry(key.toString(), _normalizeServerReply(value)),
+        (key, value) => MapEntry(Decoders.string(key), _normalizeServerReply(value)),
       );
     }
     if (res is! List) {
@@ -614,7 +615,7 @@ mixin RedisSearchCommands on RedisCommandExecutor {
     final config = <String, dynamic>{};
     for (final entry in res) {
       if (entry is List && entry.length >= 2) {
-        config[entry[0].toString()] = _normalizeServerReply(entry[1]);
+        config[Decoders.string(entry[0])] = _normalizeServerReply(entry[1]);
       }
     }
     return config;

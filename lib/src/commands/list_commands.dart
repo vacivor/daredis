@@ -57,8 +57,8 @@ mixin RedisListCommands on RedisCommandExecutor {
   /// Pops up to [count] elements from the head of the list at [key].
   Future<List<String>> lPopCount(String key, int count) async {
     final res = await sendCommand(['LPOP', key, count]);
-    if (res is List) return res.map((e) => e.toString()).toList();
-    if (res != null) return [res.toString()];
+    if (res is List) return res.map(Decoders.string).toList();
+    if (res != null) return [Decoders.string(res)];
     return [];
   }
 
@@ -71,15 +71,15 @@ mixin RedisListCommands on RedisCommandExecutor {
   /// Pops up to [count] elements from the tail of the list at [key].
   Future<List<String>> rPopCount(String key, int count) async {
     final res = await sendCommand(['RPOP', key, count]);
-    if (res is List) return res.map((e) => e.toString()).toList();
-    if (res != null) return [res.toString()];
+    if (res is List) return res.map(Decoders.string).toList();
+    if (res != null) return [Decoders.string(res)];
     return [];
   }
 
   /// Returns the elements of the list at [key] between [start] and [stop].
   Future<List<String>> lRange(String key, int start, int stop) async {
     final res = await sendCommand(['LRANGE', key, start, stop]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -152,7 +152,7 @@ mixin RedisListCommands on RedisCommandExecutor {
   Future<Map<String, String>?> bLPop(List<String> keys, int timeout) async {
     final res = await sendCommand(['BLPOP', ...keys, timeout]);
     if (res is List && res.length == 2) {
-      return {res[0].toString(): res[1].toString()};
+      return {Decoders.string(res[0]): Decoders.string(res[1])};
     }
     return null;
   }
@@ -161,7 +161,7 @@ mixin RedisListCommands on RedisCommandExecutor {
   Future<Map<String, String>?> bRPop(List<String> keys, int timeout) async {
     final res = await sendCommand(['BRPOP', ...keys, timeout]);
     if (res is List && res.length == 2) {
-      return {res[0].toString(): res[1].toString()};
+      return {Decoders.string(res[0]): Decoders.string(res[1])};
     }
     return null;
   }
@@ -252,8 +252,8 @@ mixin RedisListCommands on RedisCommandExecutor {
     if (res == null) return null;
     if (res is List && res.length == 2 && res[1] is List) {
       return ListPopResult(
-        res[0].toString(),
-        (res[1] as List).map((value) => value.toString()).toList(),
+        Decoders.string(res[0]),
+        (res[1] as List).map(Decoders.string).toList(),
       );
     }
     throw DaredisProtocolException('Unexpected list pop response: $res');

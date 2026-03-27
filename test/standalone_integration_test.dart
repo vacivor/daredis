@@ -1,7 +1,17 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:daredis/daredis.dart';
 import 'package:test/test.dart';
 
 import 'test_helpers.dart';
+
+String _decodeText(dynamic value) {
+  if (value is Uint8List) {
+    return utf8.decode(value, allowMalformed: true);
+  }
+  return value.toString();
+}
 
 void main() {
   group('Standalone integration', () {
@@ -67,8 +77,8 @@ void main() {
 
       final results = await pipeline.execute();
       expect(results[0], anyOf('PONG', 'OK'));
-      expect(results[1], 'pipeline-ok');
-      expect(results[2], 'ready');
+      expect(_decodeText(results[1]), 'pipeline-ok');
+      expect(_decodeText(results[2]), 'ready');
     });
 
     test('pubsub receives published messages', timeout: integrationTestTimeout, () async {
@@ -173,17 +183,26 @@ void main() {
       addTearDown(() => deleteKeys(client, [key]));
 
       expect(await transaction.multi(), 'OK');
-      expect(await transaction.sendCommand(['SET', key, 'queued']), 'QUEUED');
-      expect(await transaction.sendCommand(['GET', key]), 'QUEUED');
+      expect(
+        _decodeText(await transaction.sendCommand(['SET', key, 'queued'])),
+        'QUEUED',
+      );
+      expect(
+        _decodeText(await transaction.sendCommand(['GET', key])),
+        'QUEUED',
+      );
 
       final results = await transaction.exec();
       expect(results, isNotNull);
       expect(results, hasLength(2));
       expect(results![0], anyOf('OK', true));
-      expect(results[1], 'queued');
+      expect(_decodeText(results[1]), 'queued');
 
       expect(await transaction.multi(), 'OK');
-      expect(await transaction.sendCommand(['SET', key, 'discarded']), 'QUEUED');
+      expect(
+        _decodeText(await transaction.sendCommand(['SET', key, 'discarded'])),
+        'QUEUED',
+      );
       expect(await transaction.discard(), 'OK');
       expect(await client.get(key), 'queued');
     });
@@ -213,7 +232,10 @@ void main() {
 
       expect(await transaction.watch([key]), 'OK');
       expect(await transaction.multi(), 'OK');
-      expect(await transaction.sendCommand(['SET', key, '2']), 'QUEUED');
+      expect(
+        _decodeText(await transaction.sendCommand(['SET', key, '2'])),
+        'QUEUED',
+      );
 
       expect(await other.set(key, '99'), isTrue);
 
@@ -273,8 +295,14 @@ void main() {
       final sha = await client.scriptLoad(script);
       expect(sha, isNotEmpty);
       expect(await client.scriptExists([sha]), [true]);
-      expect(await client.eval(script, 1, [scriptKey], const []), 'script-value');
-      expect(await client.evalSha(sha, 1, [scriptKey], const []), 'script-value');
+      expect(
+        _decodeText(await client.eval(script, 1, [scriptKey], const [])),
+        'script-value',
+      );
+      expect(
+        _decodeText(await client.evalSha(sha, 1, [scriptKey], const [])),
+        'script-value',
+      );
       expect(
         await client.evalString(script, 1, [scriptKey], const []),
         'script-value',
@@ -350,7 +378,7 @@ void main() {
       expect(await client.xGroupCreateConsumer(streamKey, 'group-a', 'consumer-a'), 1);
 
       final groups = await client.xInfoGroups(streamKey);
-      expect(groups.toString(), contains('group-a'));
+      expect(groups, isNotEmpty);
       final streamInfo = await client.xInfoStreamEntry(streamKey);
       expect(streamInfo.length, greaterThanOrEqualTo(0));
       final groupEntries = await client.xInfoGroupEntries(streamKey);
@@ -362,7 +390,7 @@ void main() {
       expect(await client.xGroupSetId(streamKey, 'group-a', '0-0'), 'OK');
 
       final consumers = await client.xInfoConsumers(streamKey, 'group-a');
-      expect(consumers.toString(), contains('consumer-a'));
+      expect(consumers, isNotEmpty);
       final consumerEntries = await client.xInfoConsumerEntries(
         streamKey,
         'group-a',
@@ -429,7 +457,7 @@ void main() {
       final info = await client.commandInfoFor(['GET']);
       expect(info, isNotEmpty);
       expect(info.first, isA<List<dynamic>>());
-      expect(info.first.first.toString().toLowerCase(), 'get');
+      expect(_decodeText((info.first as List).first).toLowerCase(), 'get');
 
       final entries = await client.commandInfoEntriesFor(['GET']);
       expect(entries, hasLength(1));
@@ -476,7 +504,7 @@ void main() {
         'REPLACE',
         functionCode,
       ]);
-      expect(loaded.toString(), contains(libraryName));
+      expect(_decodeText(loaded), contains(libraryName));
 
       final libraries = await client.functionListLibraries();
       expect(

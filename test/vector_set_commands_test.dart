@@ -78,11 +78,11 @@ void main() {
       expect(embedding, [1.5, 2.0, 3.25]);
       expect(executor.lastCommand, ['VEMB', 'embeddings:{1}', 'doc:1']);
 
-      executor.response = ['q8', 'raw-bytes', '1.5', '0.25'];
+      executor.response = ['q8', Uint8List.fromList([1, 2, 3]), '1.5', '0.25'];
       final raw = await executor.vEmbRaw('embeddings:{1}', 'doc:1');
       expect(raw, isNotNull);
       expect(raw!.quantizationType, 'q8');
-      expect(raw.data, 'raw-bytes');
+      expect(raw.data, Uint8List.fromList([1, 2, 3]));
       expect(raw.norm, 1.5);
       expect(raw.range, 0.25);
       expect(executor.lastCommand, ['VEMB', 'embeddings:{1}', 'doc:1', 'RAW']);

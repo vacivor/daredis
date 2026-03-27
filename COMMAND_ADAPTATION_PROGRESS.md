@@ -326,7 +326,7 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `VADD` | Yes | Yes | Ready | Adds or updates a vector-set element from `VALUES` or `FP32` input, with optional HNSW tuning and attributes. |
 | `VCARD` | Yes | Yes | Ready | Returns the number of elements in a vector set. |
 | `VDIM` | Yes | Yes | Ready | Returns the configured vector dimension for a vector set. |
-| `VEMB` | Yes | Yes | Ready | Returns a stored embedding and also exposes the `RAW` form through a dedicated helper; the raw blob is currently surfaced as a decoded string because bulk-string replies are not yet binary-safe. |
+| `VEMB` | Yes | Yes | Ready | Returns a stored embedding and also exposes the `RAW` form through a dedicated helper with binary-safe payload decoding. |
 | `VGETATTR` | Yes | Yes | Ready | Returns the JSON attributes associated with a vector-set element. |
 | `VINFO` | Yes | Yes | Ready | Returns vector-set metadata normalized as a map. |
 | `VISMEMBER` | Yes | Yes | Ready | Checks whether an element exists in a vector set. |

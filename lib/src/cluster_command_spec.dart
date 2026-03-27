@@ -118,6 +118,10 @@ class ClusterCommandSpec {
     'MODULE': noKey,
     'FUNCTION': noKey,
     'PUBSUB': noKey,
+    'MULTI': noKey,
+    'EXEC': noKey,
+    'DISCARD': noKey,
+    'UNWATCH': noKey,
     'PUBLISH': noKey,
     'SPUBLISH': CommandSpec.singleKeyAt(1),
     'MONITOR': noKey,
@@ -161,6 +165,7 @@ class ClusterCommandSpec {
     'MSETNX': CommandSpec.keyValuePairsFrom(1),
     'EXISTS': CommandSpec.keysFrom(1),
     'TOUCH': CommandSpec.keysFrom(1),
+    'WATCH': CommandSpec.keysFrom(1),
 
     'EXPIRE': CommandSpec.singleKeyAt(1),
     'PEXPIRE': CommandSpec.singleKeyAt(1),

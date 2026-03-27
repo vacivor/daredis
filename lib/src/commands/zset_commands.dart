@@ -73,8 +73,8 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final args = <dynamic>['ZRANDMEMBER', key];
     if (count != null) args.add(count);
     final res = await sendCommand(args);
-    if (res is List) return res.map((value) => value.toString()).toList();
-    if (res != null) return [res.toString()];
+    if (res is List) return res.map(Decoders.string).toList();
+    if (res != null) return [Decoders.string(res)];
     return const [];
   }
 
@@ -93,7 +93,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     ]);
 
     if (res is List) {
-      return res.map((e) => e.toString()).toList();
+      return res.map(Decoders.string).toList();
     }
     throw DaredisProtocolException(
       'Unexpected response type: ${res.runtimeType}',
@@ -109,7 +109,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final args = ['ZREVRANGE', key, start, stop];
     if (withScores) args.add('WITHSCORES');
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -126,7 +126,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     if (offset != null && count != null) args.addAll(['LIMIT', offset, count]);
 
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -143,7 +143,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     if (offset != null && count != null) args.addAll(['LIMIT', offset, count]);
 
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return const [];
   }
 
@@ -177,7 +177,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final args = <dynamic>['ZRANGEBYLEX', key, min, max];
     if (offset != null && count != null) args.addAll(['LIMIT', offset, count]);
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -191,7 +191,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final args = <dynamic>['ZREVRANGEBYLEX', key, max, min];
     if (offset != null && count != null) args.addAll(['LIMIT', offset, count]);
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return const [];
   }
 
@@ -203,7 +203,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final args = ['ZINTER', numKeys, ...keys];
     if (withScores) args.add('WITHSCORES');
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -222,13 +222,13 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     final args = ['ZUNION', numKeys, ...keys];
     if (withScores) args.add('WITHSCORES');
     final res = await sendCommand(args);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
   Future<List<String>> zDiff(int numKeys, List<String> keys) async {
     final res = await sendCommand(['ZDIFF', numKeys, ...keys]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -303,13 +303,13 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
 
   Future<List<String>> zPopMin(String key, [int? count]) async {
     final res = await sendCommand(['ZPOPMIN', key, ?count]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
   Future<List<String>> zPopMax(String key, [int? count]) async {
     final res = await sendCommand(['ZPOPMAX', key, ?count]);
-    if (res is List) return res.map((e) => e.toString()).toList();
+    if (res is List) return res.map(Decoders.string).toList();
     return [];
   }
 
@@ -358,12 +358,12 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
 
     final res = await sendCommand(args);
     if (res is List && res.length == 2 && res[1] is List) {
-      final nextCursor = int.tryParse(res[0].toString()) ?? 0;
+      final nextCursor = Decoders.toInt(res[0]);
       final list = res[1] as List;
       final entries = <MapEntry<String, double>>[];
       for (var i = 0; i < list.length; i += 2) {
-        final member = list[i].toString();
-        final score = double.parse(list[i + 1].toString());
+        final member = Decoders.string(list[i]);
+        final score = Decoders.toDouble(list[i + 1]);
         entries.add(MapEntry(member, score));
       }
       return ScanResult(nextCursor, entries);
@@ -375,7 +375,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     if (res == null) return null;
     if (res is List && res.length == 2 && res[1] is List) {
       return ZSetPopResult(
-        res[0].toString(),
+        Decoders.string(res[0]),
         _parseScoredMembers(res[1]),
       );
     }
@@ -386,8 +386,8 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     if (res == null) return null;
     if (res is List && res.length == 3) {
       return ZSetPopResult(
-        res[0].toString(),
-        [ZSetScoredMember(res[1].toString(), Decoders.toDouble(res[2]))],
+        Decoders.string(res[0]),
+        [ZSetScoredMember(Decoders.string(res[1]), Decoders.toDouble(res[2]))],
       );
     }
     throw DaredisProtocolException(
@@ -404,7 +404,7 @@ mixin RedisSortedSetCommands on RedisCommandExecutor {
     return value.map((entry) {
       if (entry is List && entry.length == 2) {
         return ZSetScoredMember(
-          entry[0].toString(),
+          Decoders.string(entry[0]),
           Decoders.toDouble(entry[1]),
         );
       }
