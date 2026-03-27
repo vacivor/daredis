@@ -14,6 +14,7 @@ It is designed around a simple rule:
 - Pub/Sub uses a dedicated connection
 - transactions use a dedicated connection
 - cluster commands route to the correct node and use per-node pools
+- dangerous admin commands are intentionally kept off the default client surface
 
 ## Features
 
@@ -178,9 +179,20 @@ The package models command availability through concrete client/session types.
 - `Daredis` exposes the normal command groups for pooled single-node access
 - `DaredisCluster` exposes the normal command groups plus cluster-only helpers
 - `RedisTransaction` exposes transaction commands like `WATCH`, `MULTI`, and `EXEC`
+- `RedisPubSub` exposes subscribe and unsubscribe commands on a dedicated socket
+- dangerous operational helpers are isolated in `RedisAdminCommands`
 
 This keeps command availability aligned with the underlying connection model
 instead of exposing every command on every executor shape.
+
+In practice, command support falls into a few access tiers:
+
+- default client: ordinary command helpers on `Daredis` and `DaredisCluster`
+- dedicated-session only: commands that depend on one pinned connection, such as Pub/Sub, transactions, `WAIT`, `WAITAOF`, `RESET`, `QUIT`, and standalone `SELECT`
+- admin-only: dangerous or operational helpers intentionally kept out of the pooled default clients
+
+The coverage tracker reports support at the correct layer, not only on the
+default client surface.
 
 ### Cluster Multi-Key Rules
 
@@ -286,6 +298,11 @@ node.
 
 Transaction sessions are single-use. After `close()`, open a fresh session
 with `openTransaction()` instead of reconnecting the old one.
+
+Dedicated transaction sessions also carry connection-scoped helpers such as
+`WAIT`, `WAITAOF`, `RESET`, and `QUIT`. These are intentionally unavailable on
+the pooled default client because their semantics depend on one specific
+connection.
 
 ### Pub/Sub
 

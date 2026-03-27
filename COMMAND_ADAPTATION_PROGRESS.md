@@ -6,10 +6,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 ## Legend
 
-- `Helper`: `Yes` means a typed helper appears to exist; `Family` means support exists at the command-family level but may not be exposed as a dedicated helper for that exact command; `No` means raw `sendCommand()` only.
+- `Helper`: `Yes` means a typed helper exists; `Family` means support exists at the command-family level but may not be exposed as a dedicated helper for that exact command; `No` means raw `sendCommand()` only.
 - `Cluster`: `Yes` means `ClusterCommandSpec` has direct support; `Family` means routing is handled by a family-level parser or no-key family rule; `No` means no dedicated local routing support.
-- `Status`: a compact summary derived from `Helper` and `Cluster`.
+- `Status`: a compact summary derived from `Helper` and `Cluster`, not a promise that the command appears on every default client surface.
 - Some dangerous administrative helpers are intentionally isolated in `RedisAdminCommands` and are not mixed into the default `Daredis` / `DaredisCluster` client APIs.
+- Session-only commands are counted as supported when they are exposed on the correct dedicated API, such as `RedisPubSub`, `RedisTransaction`, or dedicated connection helpers.
 
 ## Summary
 
