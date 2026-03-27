@@ -128,6 +128,22 @@ void main() {
         ]),
         ['set:{7}', 'other:{7}'],
       );
+
+      expect(
+        ClusterCommandSpec.extractKeys([
+          'PFDEBUG',
+          'GETREG',
+          'hll:{7}',
+          0,
+        ]),
+        ['hll:{7}'],
+      );
+
+      expect(ClusterCommandSpec.extractKeys(['PFSELFTEST']), isEmpty);
+      expect(ClusterCommandSpec.extractKeys(['WAIT', 1, 1000]), isEmpty);
+      expect(ClusterCommandSpec.extractKeys(['WAITAOF', 1, 1, 1000]), isEmpty);
+      expect(ClusterCommandSpec.extractKeys(['QUIT']), isEmpty);
+      expect(ClusterCommandSpec.extractKeys(['RESET']), isEmpty);
     });
 
     test('extracts source and store keys from sort commands', () {

@@ -234,6 +234,24 @@ class Connection {
     await _disposeSocket(graceful: true);
   }
 
+  /// Sends `QUIT` and closes the socket without attempting to reconnect.
+  Future<void> quit() async {
+    if (_socket == null) {
+      return;
+    }
+    _shouldReconnect = false;
+    _isReconnecting = false;
+    _reconnectAttempts = 0;
+    try {
+      _socket!.add(_encoder.encodeCommand(['QUIT']));
+      await _socket!.flush();
+    } catch (_) {
+      // The server may close the connection before the client sees a reply.
+    }
+    _completePending(DaredisConnectionException('Connection closed'));
+    await _disposeSocket(graceful: true);
+  }
+
   Future<void> _handleReconnect() async {
     if (!_shouldReconnect || _isReconnecting) return;
     if (reconnectPolicy.maxAttempts != null &&

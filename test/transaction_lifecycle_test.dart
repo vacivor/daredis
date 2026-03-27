@@ -16,5 +16,18 @@ void main() {
         throwsA(isA<DaredisStateException>()),
       );
     });
+
+    test('quit permanently closes the session', () async {
+      final transaction = RedisTransaction.fromOptions(
+        const ConnectionOptions(),
+      );
+
+      await transaction.quit();
+
+      await expectLater(
+        transaction.connect(),
+        throwsA(isA<DaredisStateException>()),
+      );
+    });
   });
 }

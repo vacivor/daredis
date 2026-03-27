@@ -360,6 +360,13 @@ class RedisRoleInfo {
   }
 }
 
+class RedisWaitAofResult {
+  final int localFsyncCount;
+  final int replicaFsyncCount;
+
+  const RedisWaitAofResult(this.localFsyncCount, this.replicaFsyncCount);
+}
+
 class RedisLatencySample {
   final int timestamp;
   final int latencyMilliseconds;
@@ -471,6 +478,24 @@ List<Map<String, dynamic>> _serverReplyAsMapList(dynamic value) {
 /// Dangerous administrative Redis commands that are intentionally not exposed
 /// on the default `Daredis` and `DaredisCluster` client surfaces.
 mixin RedisAdminCommands on RedisCommandExecutor {
+  Future<dynamic> pfDebug(
+    String subcommand, {
+    String? key,
+    List<dynamic> args = const [],
+  }) {
+    final command = <dynamic>['PFDEBUG', subcommand];
+    if (key != null) {
+      command.add(key);
+    }
+    command.addAll(args);
+    return sendCommand(command);
+  }
+
+  Future<String> pfSelfTest() async {
+    final res = await sendCommand(['PFSELFTEST']);
+    return Decoders.string(res);
+  }
+
   Future<String> configSet(String parameter, String value) async {
     final res = await sendCommand(['CONFIG', 'SET', parameter, value]);
     return Decoders.string(res);
@@ -1198,6 +1223,40 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
 
   Future<String> aclLogReset() async {
     final res = await sendCommand(['ACL', 'LOG', 'RESET']);
+    return Decoders.string(res);
+  }
+}
+
+mixin RedisDedicatedConnectionCommands on RedisCommandExecutor {
+  Future<int> waitReplicas(int numReplicas, int timeoutMs) async {
+    final res = await sendCommand(['WAIT', numReplicas, timeoutMs]);
+    return Decoders.toInt(res);
+  }
+
+  Future<RedisWaitAofResult> waitAof(
+    int numLocal,
+    int numReplicas,
+    int timeoutMs,
+  ) async {
+    final res = await sendCommand(['WAITAOF', numLocal, numReplicas, timeoutMs]);
+    if (res is List && res.length == 2) {
+      return RedisWaitAofResult(
+        Decoders.toInt(res[0]),
+        Decoders.toInt(res[1]),
+      );
+    }
+    throw DaredisProtocolException('Unexpected WAITAOF response: $res');
+  }
+
+  Future<String> resetConnection() async {
+    final res = await sendCommand(['RESET']);
+    return Decoders.string(res);
+  }
+}
+
+mixin RedisStandaloneConnectionCommands on RedisCommandExecutor {
+  Future<String> selectDb(int database) async {
+    final res = await sendCommand(['SELECT', database]);
     return Decoders.string(res);
   }
 }

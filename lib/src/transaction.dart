@@ -8,6 +8,8 @@ import 'exceptions.dart';
 class RedisTransaction extends RedisTransactionSession
     with
         RedisServerCommands,
+        RedisDedicatedConnectionCommands,
+        RedisStandaloneConnectionCommands,
         RedisStringCommands,
         RedisKeyCommands,
         RedisListCommands,
@@ -59,6 +61,13 @@ class RedisTransaction extends RedisTransactionSession
     ensureReady();
     await _connection.ensureConnected();
     return _connection.sendCommand(command, timeout: timeout);
+  }
+
+  /// Sends `QUIT` and closes the dedicated transaction connection.
+  Future<void> quit() async {
+    _ensureOpen();
+    _closed = true;
+    await _connection.quit();
   }
 
   void _ensureOpen() {

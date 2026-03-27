@@ -24,6 +24,30 @@ class _FakeAdminExecutor extends RedisCommandExecutor with RedisAdminCommands {
   }
 }
 
+class _FakeDedicatedConnectionExecutor extends RedisCommandExecutor
+    with RedisDedicatedConnectionCommands {
+  List<dynamic>? lastCommand;
+  dynamic response;
+
+  @override
+  Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) async {
+    lastCommand = List<dynamic>.from(command);
+    return response;
+  }
+}
+
+class _FakeStandaloneConnectionExecutor extends RedisCommandExecutor
+    with RedisStandaloneConnectionCommands {
+  List<dynamic>? lastCommand;
+  dynamic response;
+
+  @override
+  Future<dynamic> sendCommand(List<dynamic> command, {Duration? timeout}) async {
+    lastCommand = List<dynamic>.from(command);
+    return response;
+  }
+}
+
 void main() {
   group('RedisServerCommands', () {
     test('auth builds AUTH with password only', () async {
@@ -119,6 +143,56 @@ void main() {
         {'name': 'json', 'ver': 10000, 'path': '/tmp/json.so'},
       ]);
       expect(executor.lastCommand, ['MODULE', 'LIST']);
+    });
+
+    test('pfDebug builds PFDEBUG with optional key and args', () async {
+      final executor = _FakeAdminExecutor()..response = ['encoding', 'sparse'];
+
+      final result = await executor.pfDebug(
+        'GETREG',
+        key: 'hll:{1}',
+        args: [0],
+      );
+
+      expect(result, ['encoding', 'sparse']);
+      expect(executor.lastCommand, ['PFDEBUG', 'GETREG', 'hll:{1}', 0]);
+    });
+
+    test('pfSelfTest builds PFSELFTEST', () async {
+      final executor = _FakeAdminExecutor()..response = 'OK';
+
+      final result = await executor.pfSelfTest();
+
+      expect(result, 'OK');
+      expect(executor.lastCommand, ['PFSELFTEST']);
+    });
+
+    test('wait helpers build dedicated connection commands', () async {
+      final executor = _FakeDedicatedConnectionExecutor()..response = 2;
+
+      final wait = await executor.waitReplicas(2, 1000);
+      expect(wait, 2);
+      expect(executor.lastCommand, ['WAIT', 2, 1000]);
+
+      executor.response = [1, 3];
+      final waitAof = await executor.waitAof(1, 3, 500);
+      expect(waitAof.localFsyncCount, 1);
+      expect(waitAof.replicaFsyncCount, 3);
+      expect(executor.lastCommand, ['WAITAOF', 1, 3, 500]);
+
+      executor.response = 'RESET';
+      final reset = await executor.resetConnection();
+      expect(reset, 'RESET');
+      expect(executor.lastCommand, ['RESET']);
+    });
+
+    test('selectDb builds SELECT on standalone dedicated connections', () async {
+      final executor = _FakeStandaloneConnectionExecutor()..response = 'OK';
+
+      final result = await executor.selectDb(3);
+
+      expect(result, 'OK');
+      expect(executor.lastCommand, ['SELECT', 3]);
     });
 
     test('moduleLoad builds MODULE LOAD', () async {

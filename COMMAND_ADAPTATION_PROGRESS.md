@@ -14,11 +14,11 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 ## Summary
 
 - Total commands tracked: 452
-- Ready: 431
+- Ready: 437
 - Partial: 0
-- Helper only: 14
+- Helper only: 15
 - Raw + routed: 0
-- Raw only: 7
+- Raw only: 0
 
 ## String commands
 
@@ -212,9 +212,9 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | --- | --- | --- | --- | --- |
 | `PFADD` | Yes | Yes | Ready | Adds elements to a HyperLogLog key. Creates the key if it doesn't exist. |
 | `PFCOUNT` | Yes | Yes | Ready | Returns the approximated cardinality of the set(s) observed by the HyperLogLog key(s). |
-| `PFDEBUG` | No | No | Raw only | Raw only |
+| `PFDEBUG` | Family | Yes | Ready | Admin-only helper family for HyperLogLog debugging subcommands. |
 | `PFMERGE` | Yes | Yes | Ready | Merges one or more HyperLogLog values into a single key. |
-| `PFSELFTEST` | No | No | Raw only | Raw only |
+| `PFSELFTEST` | Yes | Yes | Ready | Admin-only helper. Runs the internal HyperLogLog self-test. |
 ## Geospatial commands
 
 | Command | Helper | Cluster | Status | Notes |
@@ -410,9 +410,9 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `ECHO` | Yes | Yes | Ready | Returns the given string. |
 | `HELLO` | Yes | Yes | Ready | Handshakes with the Redis server. |
 | `PING` | Yes | Yes | Ready | Returns the server's liveliness response. |
-| `QUIT` | No | No | Raw only | Raw only |
-| `RESET` | No | No | Raw only | Raw only |
-| `SELECT` | No | No | Raw only | Raw only |
+| `QUIT` | Yes | Yes | Ready | Dedicated-session only helper. Closes the current standalone or pinned transaction connection. |
+| `RESET` | Yes | Yes | Ready | Dedicated-session only helper. Resets connection state on a dedicated session. |
+| `SELECT` | Yes | No | Helper only | Dedicated-session only helper for standalone connections; intentionally unavailable on cluster clients. |
 ## Server commands
 
 | Command | Helper | Cluster | Status | Notes |
@@ -554,8 +554,8 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `TTL` | Yes | Yes | Ready | Returns the expiration time in seconds of a key. |
 | `TYPE` | Yes | Yes | Ready | Determines the type of value stored at a key. |
 | `UNLINK` | Yes | Yes | Ready | Asynchronously deletes one or more keys. |
-| `WAIT` | No | No | Raw only | Raw only |
-| `WAITAOF` | No | No | Raw only | Raw only |
+| `WAIT` | Yes | Yes | Ready | Dedicated-session only helper. Waits for replica acknowledgements on the current connection. |
+| `WAITAOF` | Yes | Yes | Ready | Dedicated-session only helper. Waits for local and replica AOF fsync acknowledgements on the current connection. |
 
 ## Maintenance
 

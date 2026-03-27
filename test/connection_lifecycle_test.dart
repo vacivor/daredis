@@ -57,6 +57,42 @@ void main() {
       await server.close();
     });
 
+    test('quit sends QUIT and closes without reconnecting', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sockets = <Socket>[];
+      final received = <List<int>>[];
+
+      final serverSubscription = server.listen((socket) {
+        sockets.add(socket);
+        socket.listen(
+          (data) => received.add(List<int>.from(data)),
+          onDone: () {},
+        );
+      });
+      final connection = Connection(
+        host: InternetAddress.loopbackIPv4.address,
+        port: server.port,
+        reconnectPolicy: const ReconnectPolicy(
+          maxAttempts: 2,
+          delay: Duration(milliseconds: 20),
+        ),
+      );
+
+      await connection.connect();
+      await connection.quit();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      expect(connection.isConnected, isFalse);
+      expect(sockets, hasLength(1));
+      expect(String.fromCharCodes(received.expand((chunk) => chunk)), contains('QUIT'));
+
+      await serverSubscription.cancel();
+      for (final socket in sockets) {
+        await socket.close();
+      }
+      await server.close();
+    });
+
     test('auth failures remain command errors during connect', () async {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       final sockets = <Socket>[];

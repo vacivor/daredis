@@ -204,6 +204,7 @@ class DaredisCluster extends RedisClusterClient
 class RedisClusterTransaction extends RedisTransactionSession
     with
         RedisServerCommands,
+        RedisDedicatedConnectionCommands,
         RedisStringCommands,
         RedisKeyCommands,
         RedisListCommands,
@@ -270,6 +271,13 @@ class RedisClusterTransaction extends RedisTransactionSession
       }
       rethrow;
     }
+  }
+
+  /// Sends `QUIT` and closes the pinned cluster transaction connection.
+  Future<void> quit() async {
+    _ensureOpen();
+    _closed = true;
+    await _connection.quit();
   }
 
   void _ensureOpen() {
