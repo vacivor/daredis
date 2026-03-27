@@ -366,6 +366,14 @@ class ClusterCommandSpec {
     'TS.RANGE': CommandSpec.singleKeyAt(1),
     'TS.REVRANGE': CommandSpec.singleKeyAt(1),
 
+    'TOPK.ADD': CommandSpec.singleKeyAt(1),
+    'TOPK.COUNT': CommandSpec.singleKeyAt(1),
+    'TOPK.INCRBY': CommandSpec.singleKeyAt(1),
+    'TOPK.INFO': CommandSpec.singleKeyAt(1),
+    'TOPK.LIST': CommandSpec.singleKeyAt(1),
+    'TOPK.QUERY': CommandSpec.singleKeyAt(1),
+    'TOPK.RESERVE': CommandSpec.singleKeyAt(1),
+
     'VADD': CommandSpec.singleKeyAt(1),
     'VCARD': CommandSpec.singleKeyAt(1),
     'VDIM': CommandSpec.singleKeyAt(1),

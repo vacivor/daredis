@@ -301,6 +301,21 @@ void main() {
       expect(ClusterCommandSpec.extractKeys(['FT.CREATE', 'idx', 'SCHEMA', 'title', 'TEXT']), isEmpty);
     });
 
+    test('extracts keys from topk commands', () {
+      expect(
+        ClusterCommandSpec.extractKeys(['TOPK.RESERVE', 'topk:{1}', 5, 2000, 7, 0.925]),
+        ['topk:{1}'],
+      );
+      expect(
+        ClusterCommandSpec.extractKeys(['TOPK.ADD', 'topk:{1}', 'foo', 'bar']),
+        ['topk:{1}'],
+      );
+      expect(
+        ClusterCommandSpec.extractKeys(['TOPK.LIST', 'topk:{1}', 'WITHCOUNT']),
+        ['topk:{1}'],
+      );
+    });
+
     test('extracts direct and KEYS-style migrate keys', () {
       expect(
         ClusterCommandSpec.extractKeys([

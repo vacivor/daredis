@@ -13,8 +13,8 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 
 ## Summary
 
-- Total commands tracked: 445
-- Ready: 424
+- Total commands tracked: 452
+- Ready: 431
 - Partial: 0
 - Helper only: 14
 - Raw + routed: 0
@@ -308,6 +308,17 @@ Source: https://redis.io/docs/latest/commands/redis-8-6-commands/
 | `TS.QUERYINDEX` | Yes | Yes | Ready | Returns the keys matching a label-filter query. |
 | `TS.RANGE` | Yes | Yes | Ready | Queries a forward range from a single time series with filtering and aggregation options. |
 | `TS.REVRANGE` | Yes | Yes | Ready | Queries a reverse range from a single time series with filtering and aggregation options. |
+## TopK commands
+
+| Command | Helper | Cluster | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `TOPK.ADD` | Yes | Yes | Ready | Adds one or more items to a TopK sketch and returns the evicted items. |
+| `TOPK.COUNT` | Yes | Yes | Ready | Returns approximate counts for one or more items in a TopK sketch. |
+| `TOPK.INCRBY` | Yes | Yes | Ready | Increments one or more items in a TopK sketch by explicit amounts. |
+| `TOPK.INFO` | Yes | Yes | Ready | Returns TopK sketch metadata as a typed info object. |
+| `TOPK.LIST` | Yes | Yes | Ready | Returns the current TopK entries, with optional counts. |
+| `TOPK.QUERY` | Yes | Yes | Ready | Checks whether one or more items are currently in the TopK list. |
+| `TOPK.RESERVE` | Yes | Yes | Ready | Initializes a TopK sketch with the requested size and optional width/depth/decay tuning. |
 ## Vector set commands
 
 | Command | Helper | Cluster | Status | Notes |

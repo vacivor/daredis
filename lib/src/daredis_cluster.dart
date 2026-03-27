@@ -95,6 +95,7 @@ class DaredisCluster extends RedisClusterClient
         RedisJsonCommands,
         RedisSearchCommands,
         RedisTimeSeriesCommands,
+        RedisTopKCommands,
         RedisVectorSetCommands,
         RedisHyperLogLogCommands,
         RedisClusterCommands
@@ -213,6 +214,7 @@ class RedisClusterTransaction extends RedisTransactionSession
         RedisGeoCommands,
         RedisSearchCommands,
         RedisTimeSeriesCommands,
+        RedisTopKCommands,
         RedisVectorSetCommands,
         RedisHyperLogLogCommands,
         RedisTransactionCommands {
