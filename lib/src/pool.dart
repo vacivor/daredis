@@ -512,6 +512,7 @@ class Pool<T> {
     unawaited(
       future.catchError((Object error, StackTrace stackTrace) {
         Zone.current.handleUncaughtError(error, stackTrace);
+        return null;
       }),
     );
   }

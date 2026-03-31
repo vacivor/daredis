@@ -632,7 +632,11 @@ class _DaredisClusterConnection extends RedisClusterClient {
   }
 
   Future<void> _refreshSlots({ClusterNodeAddress? hint}) async {
-    final candidates = <ClusterNodeAddress>[?hint, ..._pools.keys];
+    // Probe the hinted node first when available, then fall back to known pools.
+    final candidates = <ClusterNodeAddress>[
+      ?hint,
+      ..._pools.keys,
+    ];
     for (final node in candidates) {
       final pool = _poolForAddress(node);
       try {

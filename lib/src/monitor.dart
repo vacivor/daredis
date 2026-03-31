@@ -164,8 +164,12 @@ class RedisMonitor {
     unawaited(_handleReconnect());
   }
 
-  void _failPendingResponses([DaredisException? error]) {
-    final exception = error ?? DaredisNetworkException('Connection closed');
+  void _failPendingResponses([Object? error]) {
+    final exception = error is DaredisException
+        ? error
+        : DaredisNetworkException(
+            error == null ? 'Connection closed' : 'Connection error: $error',
+          );
     while (_responseQueue.isNotEmpty) {
       _responseQueue.removeFirst().completeError(exception);
     }
@@ -173,9 +177,7 @@ class RedisMonitor {
 
   void _cleanup(dynamic error) {
     _monitoring = false;
-    _failPendingResponses(
-      error is DaredisException ? error : null,
-    );
+    _failPendingResponses(error);
     final subscription = _socketSubscription;
     final socket = _socket;
     _socketSubscription = null;
