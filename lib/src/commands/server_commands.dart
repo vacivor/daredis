@@ -448,7 +448,7 @@ Map<String, dynamic> _serverReplyAsMap(dynamic value) {
       ),
     );
   }
-  if (value is List && value is! Uint8List && value.length.isEven) {
+  if (_looksLikeServerMapList(value)) {
     final map = <String, dynamic>{};
     for (var i = 0; i < value.length; i += 2) {
       map[Decoders.string(value[i])] = _normalizeServerMapValue(value[i + 1]);
@@ -475,7 +475,7 @@ dynamic _normalizeServerMapValue(dynamic value) {
   if (value is Uint8List) {
     return Decoders.string(value);
   }
-  if (value is Map || (value is List && value is! Uint8List && value.length.isEven)) {
+  if (value is Map || _looksLikeServerMapList(value)) {
     try {
       return _serverReplyAsMap(value);
     } on DaredisProtocolException {
@@ -486,6 +486,20 @@ dynamic _normalizeServerMapValue(dynamic value) {
     return value.map(_normalizeServerMapValue).toList(growable: false);
   }
   return value;
+}
+
+bool _looksLikeServerMapList(dynamic value) {
+  if (value is! List || value is Uint8List || value.length.isOdd) {
+    return false;
+  }
+  for (var i = 0; i < value.length; i += 2) {
+    final key = value[i];
+    if (key is String || key is Uint8List || key is List<int>) {
+      continue;
+    }
+    return false;
+  }
+  return true;
 }
 
 extension _RedisSharedServerReadHelpers on RedisCommandExecutor {

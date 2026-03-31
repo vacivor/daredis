@@ -60,6 +60,34 @@ void main() {
       await pool.close();
     });
 
+    test('checked-out items do not accrue idle timeout until released', () async {
+      var nextId = 0;
+      final disposed = <int>[];
+      final pool = Pool<int>(
+        config: PoolConfig(
+          maxSize: 1,
+          maxIdle: 1,
+          idleTimeout: const Duration(milliseconds: 5),
+          testOnBorrow: false,
+          testOnReturn: false,
+        ),
+        create: () async => ++nextId,
+        dispose: (item) async => disposed.add(item),
+      );
+
+      final first = await pool.acquire();
+      await Future<void>.delayed(const Duration(milliseconds: 15));
+      await pool.release(first);
+
+      final reused = await pool.acquire();
+
+      expect(reused, first);
+      expect(disposed, isEmpty);
+
+      await pool.release(reused);
+      await pool.close();
+    });
+
     test('retries create failures and records metrics', () async {
       var attempts = 0;
       final pool = Pool<int>(

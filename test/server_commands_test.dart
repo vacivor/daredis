@@ -159,6 +159,18 @@ void main() {
       expect(executor.lastCommand, ['ACL', 'LOG']);
     });
 
+    test('functionStats preserves even-length numeric lists inside map values', () async {
+      final executor = _FakeServerExecutor()
+        ..response = ['samples', [1, 2, 3, 4]];
+
+      final result = await executor.functionStats();
+
+      expect(result, {
+        'samples': [1, 2, 3, 4],
+      });
+      expect(executor.lastCommand, ['FUNCTION', 'STATS']);
+    });
+
     test('pfDebug builds PFDEBUG with optional key and args', () async {
       final executor = _FakeAdminExecutor()..response = ['encoding', 'sparse'];
 

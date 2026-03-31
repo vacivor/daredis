@@ -262,12 +262,6 @@ class Pool<T> {
 
     // Hand the item directly to a waiter when one exists.
     if (_waiters.isNotEmpty) {
-      final idleItem = _IdleItem(item);
-      if (_isIdleExpired(idleItem)) {
-        await _disposeItem(item);
-        _scheduleMaintenance(_serveWaiters());
-        return;
-      }
       if (await _isValid(item, config.testOnBorrow)) {
         _waiters.removeFirst().complete(item);
         return;
@@ -279,13 +273,8 @@ class Pool<T> {
 
     // Otherwise return the item to the idle queue.
     if (_idle.length < config.maxIdle) {
-      final idleItem = _IdleItem(item);
-      if (_isIdleExpired(idleItem)) {
-        await _disposeItem(item);
-        _scheduleMaintenance(_serveWaiters());
-        return;
-      }
-      _idle.addLast(idleItem);
+      // Idle timeout starts when the item is returned to the idle queue.
+      _idle.addLast(_IdleItem(item));
       _scheduleMaintenance(_ensureMinIdle());
     } else {
       await _disposeItem(item);
