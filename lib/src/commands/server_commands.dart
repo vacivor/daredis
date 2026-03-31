@@ -488,6 +488,224 @@ dynamic _normalizeServerMapValue(dynamic value) {
   return value;
 }
 
+extension _RedisSharedServerReadHelpers on RedisCommandExecutor {
+  Future<int> _sharedCommandCount() async {
+    final res = await sendCommand(['COMMAND', 'COUNT']);
+    return Decoders.toInt(res);
+  }
+
+  Future<Map<String, dynamic>> _sharedCommandDocs([List<String>? commands]) async {
+    final res = await sendCommand([
+      'COMMAND',
+      'DOCS',
+      if (commands != null) ...commands,
+    ]);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<List<dynamic>> _sharedCommandInfo([List<String>? commands]) async {
+    final res = await sendCommand([
+      'COMMAND',
+      'INFO',
+      if (commands != null) ...commands,
+    ]);
+    if (res is List) {
+      return List<dynamic>.from(res);
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> _sharedCommandList() async {
+    final res = await sendCommand(['COMMAND']);
+    if (res is List) {
+      return List<dynamic>.from(res);
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> _sharedSlowlogGet([int? count]) async {
+    final args = <dynamic>['SLOWLOG', 'GET'];
+    if (count != null) args.add(count);
+    final res = await sendCommand(args);
+    if (res is List) {
+      return List<dynamic>.from(res);
+    }
+    return [];
+  }
+
+  Future<int> _sharedSlowlogLen() async {
+    final res = await sendCommand(['SLOWLOG', 'LEN']);
+    return Decoders.toInt(res);
+  }
+
+  Future<String> _sharedSlowlogReset() async {
+    final res = await sendCommand(['SLOWLOG', 'RESET']);
+    return Decoders.string(res);
+  }
+
+  Future<String> _sharedMemoryDoctor() async {
+    final res = await sendCommand(['MEMORY', 'DOCTOR']);
+    return Decoders.string(res);
+  }
+
+  Future<String> _sharedMemoryMallocStats() async {
+    final res = await sendCommand(['MEMORY', 'MALLOC-STATS']);
+    return Decoders.string(res);
+  }
+
+  Future<String> _sharedMemoryPurge() async {
+    final res = await sendCommand(['MEMORY', 'PURGE']);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> _sharedMemoryStats() async {
+    final res = await sendCommand(['MEMORY', 'STATS']);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<String> _sharedLatencyDoctor() async {
+    final res = await sendCommand(['LATENCY', 'DOCTOR']);
+    return Decoders.string(res);
+  }
+
+  Future<String> _sharedLatencyGraph(String event) async {
+    final res = await sendCommand(['LATENCY', 'GRAPH', event]);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> _sharedLatencyHistogram(
+    [List<String>? commands]
+  ) async {
+    final res = await sendCommand([
+      'LATENCY',
+      'HISTOGRAM',
+      if (commands != null) ...commands,
+    ]);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<List<RedisLatencySample>> _sharedLatencyHistory(String event) async {
+    final res = await sendCommand(['LATENCY', 'HISTORY', event]);
+    if (res is! List) return const [];
+    return res.whereType<List>().map((entry) {
+      return RedisLatencySample(
+        timestamp: Decoders.toInt(entry[0]),
+        latencyMilliseconds: Decoders.toInt(entry[1]),
+      );
+    }).toList(growable: false);
+  }
+
+  Future<List<RedisLatencyLatestEvent>> _sharedLatencyLatest() async {
+    final res = await sendCommand(['LATENCY', 'LATEST']);
+    if (res is! List) return const [];
+    return res.whereType<List>().map((entry) {
+      return RedisLatencyLatestEvent(
+        event: Decoders.string(entry[0]),
+        timestamp: Decoders.toInt(entry[1]),
+        latestLatencyMilliseconds: Decoders.toInt(entry[2]),
+        maxLatencyMilliseconds: Decoders.toInt(entry[3]),
+      );
+    }).toList(growable: false);
+  }
+
+  Future<int> _sharedLatencyReset([List<String>? events]) async {
+    final res = await sendCommand([
+      'LATENCY',
+      'RESET',
+      if (events != null) ...events,
+    ]);
+    return Decoders.toInt(res);
+  }
+
+  Future<List<Map<String, dynamic>>> _sharedModuleList() async {
+    final res = await sendCommand(['MODULE', 'LIST']);
+    return _serverReplyAsMapList(res);
+  }
+
+  Future<List<Map<String, dynamic>>> _sharedFunctionList({
+    String? libraryName,
+    bool withCode = false,
+  }) async {
+    final args = ['FUNCTION', 'LIST'];
+    if (libraryName != null) args.addAll(['LIBRARYNAME', libraryName]);
+    if (withCode) args.add('WITHCODE');
+    final res = await sendCommand(args);
+    return _serverReplyAsMapList(res);
+  }
+
+  Future<Map<String, dynamic>> _sharedFunctionStats() async {
+    final res = await sendCommand(['FUNCTION', 'STATS']);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<List<String>> _sharedAclList() async {
+    final res = await sendCommand(['ACL', 'LIST']);
+    if (res is List) return res.map(Decoders.string).toList(growable: false);
+    final text = Decoders.toStringOrNull(res);
+    if (text != null) return text.split('\n');
+    return [];
+  }
+
+  Future<List<String>> _sharedAclUsers() async {
+    final res = await sendCommand(['ACL', 'USERS']);
+    if (res is List) return res.map(Decoders.string).toList(growable: false);
+    return [];
+  }
+
+  Future<List<String>> _sharedAclCat([String? category]) async {
+    final args = <dynamic>['ACL', 'CAT'];
+    if (category != null) args.add(category);
+    final res = await sendCommand(args);
+    if (res is List) return res.map(Decoders.string).toList(growable: false);
+    return [];
+  }
+
+  Future<String> _sharedAclDryRun(
+    String username,
+    String command, [
+    List<String> args = const [],
+  ]) async {
+    final res = await sendCommand(['ACL', 'DRYRUN', username, command, ...args]);
+    return Decoders.string(res);
+  }
+
+  Future<Map<String, dynamic>> _sharedAclGetUser(String username) async {
+    final res = await sendCommand(['ACL', 'GETUSER', username]);
+    return _serverReplyAsMap(res);
+  }
+
+  Future<String> _sharedAclWhoAmI() async {
+    final res = await sendCommand(['ACL', 'WHOAMI']);
+    return Decoders.string(res);
+  }
+
+  Future<String> _sharedAclGenPass([int? bits]) async {
+    final args = <dynamic>['ACL', 'GENPASS'];
+    if (bits != null) args.add(bits);
+    final res = await sendCommand(args);
+    return Decoders.string(res);
+  }
+
+  Future<dynamic> _sharedAclLog([int? count]) {
+    final args = <dynamic>['ACL', 'LOG'];
+    if (count != null) args.add(count);
+    return sendCommand(args);
+  }
+
+  Future<List<dynamic>> _sharedAclLogEntries([int? count]) async {
+    final res = await _sharedAclLog(count);
+    if (res is List) {
+      return res.map(_normalizeServerReply).toList(growable: false);
+    }
+    return [];
+  }
+
+  Future<String> _sharedAclLogReset() async {
+    final res = await sendCommand(['ACL', 'LOG', 'RESET']);
+    return Decoders.string(res);
+  }
+}
+
 /// Dangerous administrative Redis commands that are intentionally not exposed
 /// on the default `Daredis` and `DaredisCluster` client surfaces.
 mixin RedisAdminCommands on RedisCommandExecutor {
@@ -675,19 +893,10 @@ mixin RedisAdminCommands on RedisCommandExecutor {
     return Decoders.string(res);
   }
 
-  Future<int> commandCount() async {
-    final res = await sendCommand(['COMMAND', 'COUNT']);
-    return Decoders.toInt(res);
-  }
+  Future<int> commandCount() => _sharedCommandCount();
 
-  Future<Map<String, dynamic>> commandDocs([List<String>? commands]) async {
-    final res = await sendCommand([
-      'COMMAND',
-      'DOCS',
-      if (commands != null) ...commands,
-    ]);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> commandDocs([List<String>? commands]) =>
+      _sharedCommandDocs(commands);
 
   Future<Map<String, dynamic>> commandDocsFor(List<String> commands) {
     return commandDocs(commands);
@@ -702,17 +911,8 @@ mixin RedisAdminCommands on RedisCommandExecutor {
         .toList(growable: false);
   }
 
-  Future<List<dynamic>> commandInfo([List<String>? commands]) async {
-    final res = await sendCommand([
-      'COMMAND',
-      'INFO',
-      if (commands != null) ...commands,
-    ]);
-    if (res is List) {
-      return List<dynamic>.from(res);
-    }
-    return [];
-  }
+  Future<List<dynamic>> commandInfo([List<String>? commands]) =>
+      _sharedCommandInfo(commands);
 
   Future<List<dynamic>> commandInfoFor(List<String> commands) {
     return commandInfo(commands);
@@ -727,106 +927,39 @@ mixin RedisAdminCommands on RedisCommandExecutor {
         .toList();
   }
 
-  Future<List<dynamic>> commandList() async {
-    final res = await sendCommand(['COMMAND']);
-    if (res is List) return res;
-    return [];
-  }
+  Future<List<dynamic>> commandList() => _sharedCommandList();
 
-  Future<List<dynamic>> slowlogGet([int? count]) async {
-    final args = <dynamic>['SLOWLOG', 'GET'];
-    if (count != null) args.add(count);
-    final res = await sendCommand(args);
-    if (res is List) return res;
-    return [];
-  }
+  Future<List<dynamic>> slowlogGet([int? count]) => _sharedSlowlogGet(count);
 
-  Future<int> slowlogLen() async {
-    final res = await sendCommand(['SLOWLOG', 'LEN']);
-    return Decoders.toInt(res);
-  }
+  Future<int> slowlogLen() => _sharedSlowlogLen();
 
-  Future<String> slowlogReset() async {
-    final res = await sendCommand(['SLOWLOG', 'RESET']);
-    return Decoders.string(res);
-  }
+  Future<String> slowlogReset() => _sharedSlowlogReset();
 
-  Future<String> memoryDoctor() async {
-    final res = await sendCommand(['MEMORY', 'DOCTOR']);
-    return Decoders.string(res);
-  }
+  Future<String> memoryDoctor() => _sharedMemoryDoctor();
 
-  Future<String> memoryMallocStats() async {
-    final res = await sendCommand(['MEMORY', 'MALLOC-STATS']);
-    return Decoders.string(res);
-  }
+  Future<String> memoryMallocStats() => _sharedMemoryMallocStats();
 
-  Future<String> memoryPurge() async {
-    final res = await sendCommand(['MEMORY', 'PURGE']);
-    return Decoders.string(res);
-  }
+  Future<String> memoryPurge() => _sharedMemoryPurge();
 
-  Future<Map<String, dynamic>> memoryStats() async {
-    final res = await sendCommand(['MEMORY', 'STATS']);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> memoryStats() => _sharedMemoryStats();
 
-  Future<String> latencyDoctor() async {
-    final res = await sendCommand(['LATENCY', 'DOCTOR']);
-    return Decoders.string(res);
-  }
+  Future<String> latencyDoctor() => _sharedLatencyDoctor();
 
-  Future<String> latencyGraph(String event) async {
-    final res = await sendCommand(['LATENCY', 'GRAPH', event]);
-    return Decoders.string(res);
-  }
+  Future<String> latencyGraph(String event) => _sharedLatencyGraph(event);
 
-  Future<Map<String, dynamic>> latencyHistogram([List<String>? commands]) async {
-    final res = await sendCommand([
-      'LATENCY',
-      'HISTOGRAM',
-      if (commands != null) ...commands,
-    ]);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> latencyHistogram([List<String>? commands]) =>
+      _sharedLatencyHistogram(commands);
 
-  Future<List<RedisLatencySample>> latencyHistory(String event) async {
-    final res = await sendCommand(['LATENCY', 'HISTORY', event]);
-    if (res is! List) return const [];
-    return res.whereType<List>().map((entry) {
-      return RedisLatencySample(
-        timestamp: Decoders.toInt(entry[0]),
-        latencyMilliseconds: Decoders.toInt(entry[1]),
-      );
-    }).toList(growable: false);
-  }
+  Future<List<RedisLatencySample>> latencyHistory(String event) =>
+      _sharedLatencyHistory(event);
 
-  Future<List<RedisLatencyLatestEvent>> latencyLatest() async {
-    final res = await sendCommand(['LATENCY', 'LATEST']);
-    if (res is! List) return const [];
-    return res.whereType<List>().map((entry) {
-      return RedisLatencyLatestEvent(
-        event: Decoders.string(entry[0]),
-        timestamp: Decoders.toInt(entry[1]),
-        latestLatencyMilliseconds: Decoders.toInt(entry[2]),
-        maxLatencyMilliseconds: Decoders.toInt(entry[3]),
-      );
-    }).toList(growable: false);
-  }
+  Future<List<RedisLatencyLatestEvent>> latencyLatest() =>
+      _sharedLatencyLatest();
 
-  Future<int> latencyReset([List<String>? events]) async {
-    final res = await sendCommand([
-      'LATENCY',
-      'RESET',
-      if (events != null) ...events,
-    ]);
-    return Decoders.toInt(res);
-  }
+  Future<int> latencyReset([List<String>? events]) =>
+      _sharedLatencyReset(events);
 
-  Future<List<Map<String, dynamic>>> moduleList() async {
-    final res = await sendCommand(['MODULE', 'LIST']);
-    return _serverReplyAsMapList(res);
-  }
+  Future<List<Map<String, dynamic>>> moduleList() => _sharedModuleList();
 
   Future<String> moduleLoad(String path, [List<String>? args]) async {
     final res = await sendCommand([
@@ -979,19 +1112,10 @@ mixin RedisAdminCommands on RedisCommandExecutor {
 
 /// Safe read-mostly server helpers exposed on the default client APIs.
 mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
-  Future<int> commandCount() async {
-    final res = await sendCommand(['COMMAND', 'COUNT']);
-    return Decoders.toInt(res);
-  }
+  Future<int> commandCount() => _sharedCommandCount();
 
-  Future<Map<String, dynamic>> commandDocs([List<String>? commands]) async {
-    final res = await sendCommand([
-      'COMMAND',
-      'DOCS',
-      if (commands != null) ...commands,
-    ]);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> commandDocs([List<String>? commands]) =>
+      _sharedCommandDocs(commands);
 
   Future<Map<String, dynamic>> commandDocsFor(List<String> commands) {
     return commandDocs(commands);
@@ -1006,17 +1130,8 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
         .toList(growable: false);
   }
 
-  Future<List<dynamic>> commandInfo([List<String>? commands]) async {
-    final res = await sendCommand([
-      'COMMAND',
-      'INFO',
-      if (commands != null) ...commands,
-    ]);
-    if (res is List) {
-      return List<dynamic>.from(res);
-    }
-    return [];
-  }
+  Future<List<dynamic>> commandInfo([List<String>? commands]) =>
+      _sharedCommandInfo(commands);
 
   Future<List<dynamic>> commandInfoFor(List<String> commands) {
     return commandInfo(commands);
@@ -1031,117 +1146,44 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
         .toList();
   }
 
-  Future<List<dynamic>> commandList() async {
-    final res = await sendCommand(['COMMAND']);
-    if (res is List) return res;
-    return [];
-  }
+  Future<List<dynamic>> commandList() => _sharedCommandList();
 
-  Future<List<dynamic>> slowlogGet([int? count]) async {
-    final args = <dynamic>['SLOWLOG', 'GET'];
-    if (count != null) args.add(count);
-    final res = await sendCommand(args);
-    if (res is List) return res;
-    return [];
-  }
+  Future<List<dynamic>> slowlogGet([int? count]) => _sharedSlowlogGet(count);
 
-  Future<int> slowlogLen() async {
-    final res = await sendCommand(['SLOWLOG', 'LEN']);
-    return Decoders.toInt(res);
-  }
+  Future<int> slowlogLen() => _sharedSlowlogLen();
 
-  Future<String> slowlogReset() async {
-    final res = await sendCommand(['SLOWLOG', 'RESET']);
-    return Decoders.string(res);
-  }
+  Future<String> slowlogReset() => _sharedSlowlogReset();
 
-  Future<String> memoryDoctor() async {
-    final res = await sendCommand(['MEMORY', 'DOCTOR']);
-    return Decoders.string(res);
-  }
+  Future<String> memoryDoctor() => _sharedMemoryDoctor();
 
-  Future<String> memoryMallocStats() async {
-    final res = await sendCommand(['MEMORY', 'MALLOC-STATS']);
-    return Decoders.string(res);
-  }
+  Future<String> memoryMallocStats() => _sharedMemoryMallocStats();
 
-  Future<String> memoryPurge() async {
-    final res = await sendCommand(['MEMORY', 'PURGE']);
-    return Decoders.string(res);
-  }
+  Future<String> memoryPurge() => _sharedMemoryPurge();
 
-  Future<Map<String, dynamic>> memoryStats() async {
-    final res = await sendCommand(['MEMORY', 'STATS']);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> memoryStats() => _sharedMemoryStats();
 
-  Future<String> latencyDoctor() async {
-    final res = await sendCommand(['LATENCY', 'DOCTOR']);
-    return Decoders.string(res);
-  }
+  Future<String> latencyDoctor() => _sharedLatencyDoctor();
 
-  Future<String> latencyGraph(String event) async {
-    final res = await sendCommand(['LATENCY', 'GRAPH', event]);
-    return Decoders.string(res);
-  }
+  Future<String> latencyGraph(String event) => _sharedLatencyGraph(event);
 
-  Future<Map<String, dynamic>> latencyHistogram([List<String>? commands]) async {
-    final res = await sendCommand([
-      'LATENCY',
-      'HISTOGRAM',
-      if (commands != null) ...commands,
-    ]);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> latencyHistogram([List<String>? commands]) =>
+      _sharedLatencyHistogram(commands);
 
-  Future<List<RedisLatencySample>> latencyHistory(String event) async {
-    final res = await sendCommand(['LATENCY', 'HISTORY', event]);
-    if (res is! List) return const [];
-    return res.whereType<List>().map((entry) {
-      return RedisLatencySample(
-        timestamp: Decoders.toInt(entry[0]),
-        latencyMilliseconds: Decoders.toInt(entry[1]),
-      );
-    }).toList(growable: false);
-  }
+  Future<List<RedisLatencySample>> latencyHistory(String event) =>
+      _sharedLatencyHistory(event);
 
-  Future<List<RedisLatencyLatestEvent>> latencyLatest() async {
-    final res = await sendCommand(['LATENCY', 'LATEST']);
-    if (res is! List) return const [];
-    return res.whereType<List>().map((entry) {
-      return RedisLatencyLatestEvent(
-        event: Decoders.string(entry[0]),
-        timestamp: Decoders.toInt(entry[1]),
-        latestLatencyMilliseconds: Decoders.toInt(entry[2]),
-        maxLatencyMilliseconds: Decoders.toInt(entry[3]),
-      );
-    }).toList(growable: false);
-  }
+  Future<List<RedisLatencyLatestEvent>> latencyLatest() =>
+      _sharedLatencyLatest();
 
-  Future<int> latencyReset([List<String>? events]) async {
-    final res = await sendCommand([
-      'LATENCY',
-      'RESET',
-      if (events != null) ...events,
-    ]);
-    return Decoders.toInt(res);
-  }
+  Future<int> latencyReset([List<String>? events]) =>
+      _sharedLatencyReset(events);
 
-  Future<List<Map<String, dynamic>>> moduleList() async {
-    final res = await sendCommand(['MODULE', 'LIST']);
-    return _serverReplyAsMapList(res);
-  }
+  Future<List<Map<String, dynamic>>> moduleList() => _sharedModuleList();
 
   Future<List<Map<String, dynamic>>> functionList({
     String? libraryName,
     bool withCode = false,
-  }) async {
-    final args = ['FUNCTION', 'LIST'];
-    if (libraryName != null) args.addAll(['LIBRARYNAME', libraryName]);
-    if (withCode) args.add('WITHCODE');
-    final res = await sendCommand(args);
-    return _serverReplyAsMapList(res);
-  }
+  }) => _sharedFunctionList(libraryName: libraryName, withCode: withCode);
 
   Future<List<Map<String, dynamic>>> functionListLibraries({
     bool withCode = false,
@@ -1162,82 +1204,38 @@ mixin RedisServerIntrospectionCommands on RedisCommandExecutor {
         .toList();
   }
 
-  Future<Map<String, dynamic>> functionStats() async {
-    final res = await sendCommand(['FUNCTION', 'STATS']);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> functionStats() => _sharedFunctionStats();
 
   Future<RedisFunctionStats> functionStatsEntry() async {
     final res = await sendCommand(['FUNCTION', 'STATS']);
     return RedisFunctionStats.fromReply(res);
   }
 
-  Future<List<String>> aclList() async {
-    final res = await sendCommand(['ACL', 'LIST']);
-    if (res is List) return res.map(Decoders.string).toList();
-    final text = Decoders.toStringOrNull(res);
-    if (text != null) return text.split('\n');
-    return [];
-  }
+  Future<List<String>> aclList() => _sharedAclList();
 
-  Future<List<String>> aclUsers() async {
-    final res = await sendCommand(['ACL', 'USERS']);
-    if (res is List) return res.map(Decoders.string).toList();
-    return [];
-  }
+  Future<List<String>> aclUsers() => _sharedAclUsers();
 
-  Future<List<String>> aclCat([String? category]) async {
-    final args = <dynamic>['ACL', 'CAT'];
-    if (category != null) args.add(category);
-    final res = await sendCommand(args);
-    if (res is List) return res.map(Decoders.string).toList();
-    return [];
-  }
+  Future<List<String>> aclCat([String? category]) => _sharedAclCat(category);
 
   Future<String> aclDryRun(
     String username,
     String command, [
     List<String> args = const [],
-  ]) async {
-    final res = await sendCommand(['ACL', 'DRYRUN', username, command, ...args]);
-    return Decoders.string(res);
-  }
+  ]) => _sharedAclDryRun(username, command, args);
 
-  Future<Map<String, dynamic>> aclGetUser(String username) async {
-    final res = await sendCommand(['ACL', 'GETUSER', username]);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> aclGetUser(String username) =>
+      _sharedAclGetUser(username);
 
-  Future<String> aclWhoAmI() async {
-    final res = await sendCommand(['ACL', 'WHOAMI']);
-    return Decoders.string(res);
-  }
+  Future<String> aclWhoAmI() => _sharedAclWhoAmI();
 
-  Future<String> aclGenPass([int? bits]) async {
-    final args = <dynamic>['ACL', 'GENPASS'];
-    if (bits != null) args.add(bits);
-    final res = await sendCommand(args);
-    return Decoders.string(res);
-  }
+  Future<String> aclGenPass([int? bits]) => _sharedAclGenPass(bits);
 
-  Future<dynamic> aclLog([int? count]) {
-    final args = <dynamic>['ACL', 'LOG'];
-    if (count != null) args.add(count);
-    return sendCommand(args);
-  }
+  Future<dynamic> aclLog([int? count]) => _sharedAclLog(count);
 
-  Future<List<dynamic>> aclLogEntries([int? count]) async {
-    final res = await aclLog(count);
-    if (res is List) {
-      return res.map(_normalizeServerReply).toList();
-    }
-    return [];
-  }
+  Future<List<dynamic>> aclLogEntries([int? count]) =>
+      _sharedAclLogEntries(count);
 
-  Future<String> aclLogReset() async {
-    final res = await sendCommand(['ACL', 'LOG', 'RESET']);
-    return Decoders.string(res);
-  }
+  Future<String> aclLogReset() => _sharedAclLogReset();
 }
 
 mixin RedisDedicatedConnectionCommands on RedisCommandExecutor {
@@ -1512,13 +1510,7 @@ mixin RedisServerCommands on RedisCommandExecutor {
   Future<List<Map<String, dynamic>>> functionList({
     String? libraryName,
     bool withCode = false,
-  }) async {
-    final args = ['FUNCTION', 'LIST'];
-    if (libraryName != null) args.addAll(['LIBRARYNAME', libraryName]);
-    if (withCode) args.add('WITHCODE');
-    final res = await sendCommand(args);
-    return _serverReplyAsMapList(res);
-  }
+  }) => _sharedFunctionList(libraryName: libraryName, withCode: withCode);
 
   Future<List<Map<String, dynamic>>> functionListLibraries({
     bool withCode = false,
@@ -1539,82 +1531,38 @@ mixin RedisServerCommands on RedisCommandExecutor {
         .toList();
   }
 
-  Future<Map<String, dynamic>> functionStats() async {
-    final res = await sendCommand(['FUNCTION', 'STATS']);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> functionStats() => _sharedFunctionStats();
 
   Future<RedisFunctionStats> functionStatsEntry() async {
     final res = await sendCommand(['FUNCTION', 'STATS']);
     return RedisFunctionStats.fromReply(res);
   }
 
-  Future<List<String>> aclList() async {
-    final res = await sendCommand(['ACL', 'LIST']);
-    if (res is List) return res.map(Decoders.string).toList();
-    final text = Decoders.toStringOrNull(res);
-    if (text != null) return text.split('\n');
-    return [];
-  }
+  Future<List<String>> aclList() => _sharedAclList();
 
-  Future<List<String>> aclUsers() async {
-    final res = await sendCommand(['ACL', 'USERS']);
-    if (res is List) return res.map(Decoders.string).toList();
-    return [];
-  }
+  Future<List<String>> aclUsers() => _sharedAclUsers();
 
-  Future<List<String>> aclCat([String? category]) async {
-    final args = <dynamic>['ACL', 'CAT'];
-    if (category != null) args.add(category);
-    final res = await sendCommand(args);
-    if (res is List) return res.map(Decoders.string).toList();
-    return [];
-  }
+  Future<List<String>> aclCat([String? category]) => _sharedAclCat(category);
 
   Future<String> aclDryRun(
     String username,
     String command, [
     List<String> args = const [],
-  ]) async {
-    final res = await sendCommand(['ACL', 'DRYRUN', username, command, ...args]);
-    return Decoders.string(res);
-  }
+  ]) => _sharedAclDryRun(username, command, args);
 
-  Future<Map<String, dynamic>> aclGetUser(String username) async {
-    final res = await sendCommand(['ACL', 'GETUSER', username]);
-    return _serverReplyAsMap(res);
-  }
+  Future<Map<String, dynamic>> aclGetUser(String username) =>
+      _sharedAclGetUser(username);
 
-  Future<String> aclWhoAmI() async {
-    final res = await sendCommand(['ACL', 'WHOAMI']);
-    return Decoders.string(res);
-  }
+  Future<String> aclWhoAmI() => _sharedAclWhoAmI();
 
-  Future<String> aclGenPass([int? bits]) async {
-    final args = <dynamic>['ACL', 'GENPASS'];
-    if (bits != null) args.add(bits);
-    final res = await sendCommand(args);
-    return Decoders.string(res);
-  }
+  Future<String> aclGenPass([int? bits]) => _sharedAclGenPass(bits);
 
-  Future<dynamic> aclLog([int? count]) {
-    final args = <dynamic>['ACL', 'LOG'];
-    if (count != null) args.add(count);
-    return sendCommand(args);
-  }
+  Future<dynamic> aclLog([int? count]) => _sharedAclLog(count);
 
-  Future<List<dynamic>> aclLogEntries([int? count]) async {
-    final res = await aclLog(count);
-    if (res is List) {
-      return res.map(_normalizeServerReply).toList();
-    }
-    return [];
-  }
+  Future<List<dynamic>> aclLogEntries([int? count]) =>
+      _sharedAclLogEntries(count);
 
-  Future<String> aclLogReset() async {
-    final res = await sendCommand(['ACL', 'LOG', 'RESET']);
-    return Decoders.string(res);
-  }
+  Future<String> aclLogReset() => _sharedAclLogReset();
 }
 
 mixin RedisTransactionCommands on RedisTransactionSession {
