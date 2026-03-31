@@ -145,6 +145,20 @@ void main() {
       expect(executor.lastCommand, ['MODULE', 'LIST']);
     });
 
+    test('aclLogEntries preserves plain even-length string lists', () async {
+      final executor = _FakeServerExecutor()
+        ..response = [
+          ['user', 'alice', 'reason', 'auth'],
+        ];
+
+      final result = await executor.aclLogEntries();
+
+      expect(result, [
+        ['user', 'alice', 'reason', 'auth'],
+      ]);
+      expect(executor.lastCommand, ['ACL', 'LOG']);
+    });
+
     test('pfDebug builds PFDEBUG with optional key and args', () async {
       final executor = _FakeAdminExecutor()..response = ['encoding', 'sparse'];
 

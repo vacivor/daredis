@@ -434,30 +434,26 @@ dynamic _normalizeServerReply(dynamic value) {
     );
   }
   if (value is List && value is! Uint8List) {
-    final normalized = value.map(_normalizeServerReply).toList();
-    final isPairList = normalized.length.isEven &&
-        normalized.asMap().entries.every(
-          (entry) =>
-              entry.key.isOdd ||
-              entry.value is String ||
-              entry.value is Uint8List,
-        );
-    if (isPairList) {
-      final map = <String, dynamic>{};
-      for (var i = 0; i < normalized.length; i += 2) {
-        map[Decoders.string(normalized[i])] = normalized[i + 1];
-      }
-      return map;
-    }
-    return normalized;
+    return value.map(_normalizeServerReply).toList(growable: false);
   }
   return value;
 }
 
 Map<String, dynamic> _serverReplyAsMap(dynamic value) {
-  final normalized = _normalizeServerReply(value);
-  if (normalized is Map<String, dynamic>) {
-    return normalized;
+  if (value is Map) {
+    return value.map(
+      (key, nestedValue) => MapEntry(
+        Decoders.string(key),
+        _normalizeServerMapValue(nestedValue),
+      ),
+    );
+  }
+  if (value is List && value is! Uint8List && value.length.isEven) {
+    final map = <String, dynamic>{};
+    for (var i = 0; i < value.length; i += 2) {
+      map[Decoders.string(value[i])] = _normalizeServerMapValue(value[i + 1]);
+    }
+    return map;
   }
   throw DaredisProtocolException(
     'Unexpected response type: ${value.runtimeType}',
@@ -473,6 +469,23 @@ List<Map<String, dynamic>> _serverReplyAsMapList(dynamic value) {
   throw DaredisProtocolException(
     'Unexpected response type: ${value.runtimeType}',
   );
+}
+
+dynamic _normalizeServerMapValue(dynamic value) {
+  if (value is Uint8List) {
+    return Decoders.string(value);
+  }
+  if (value is Map || (value is List && value is! Uint8List && value.length.isEven)) {
+    try {
+      return _serverReplyAsMap(value);
+    } on DaredisProtocolException {
+      // Some replies legitimately contain even-length lists that are not maps.
+    }
+  }
+  if (value is List && value is! Uint8List) {
+    return value.map(_normalizeServerMapValue).toList(growable: false);
+  }
+  return value;
 }
 
 /// Dangerous administrative Redis commands that are intentionally not exposed

@@ -275,10 +275,7 @@ mixin RedisStringCommands on RedisCommandExecutor {
   Future<List<int?>> bitField(String key, List<dynamic> subcommands) async {
     final args = ['BITFIELD', key, ...subcommands];
     final res = await sendCommand(args);
-    if (res is List) {
-      return res.map((e) => e == null ? null : e as int).toList();
-    }
-    return [];
+    return _decodeNullableIntList(res);
   }
 
   /// Executes a `BITFIELD` command using [builder] to define subcommands.
@@ -293,15 +290,21 @@ mixin RedisStringCommands on RedisCommandExecutor {
   ) async {
     final args = ['BITFIELD_RO', key, ...subcommands];
     final res = await sendCommand(args);
-    if (res is List) {
-      return res.map((e) => e == null ? null : e as int).toList();
-    }
-    return [];
+    return _decodeNullableIntList(res);
   }
 
   /// Executes a read-only `BITFIELD_RO` command using [builder].
   Future<List<int?>> bitFieldReadonlyWith(String key, BitFieldBuilder builder) {
     return bitFieldReadonly(key, builder.subcommands);
+  }
+
+  List<int?> _decodeNullableIntList(dynamic value) {
+    if (value is! List || value is Uint8List) {
+      return const [];
+    }
+    return value
+        .map<int?>((entry) => entry == null ? null : Decoders.toInt(entry))
+        .toList(growable: false);
   }
 
   /// Applies a bitwise [operation] across [srcKeys] and stores the result in [destKey].

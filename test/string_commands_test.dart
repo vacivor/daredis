@@ -64,6 +64,15 @@ void main() {
       );
     });
 
+    test('bitField decodes numeric strings without unsafe casts', () async {
+      final executor = _FakeStringExecutor()..response = ['1', null, 3];
+
+      final result = await executor.bitField('bits:{1}', ['GET', 'u8', 0]);
+
+      expect(result, [1, null, 3]);
+      expect(executor.lastCommand, ['BITFIELD', 'bits:{1}', 'GET', 'u8', 0]);
+    });
+
     test('bytes helpers preserve binary payloads', () async {
       final executor = _FakeStringExecutor()
         ..response = Uint8List.fromList([0, 255, 1, 2]);
