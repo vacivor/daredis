@@ -518,7 +518,7 @@ class RedisPubSub {
     }
     _isReconnecting = true;
     _reconnectAttempts += 1;
-    await Future.delayed(reconnectPolicy.delay);
+    await Future.delayed(reconnectPolicy.delayForAttempt(_reconnectAttempts));
     if (_closed || !_shouldReconnect) {
       _isReconnecting = false;
       return;

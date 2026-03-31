@@ -14,13 +14,40 @@ class ReconnectPolicy {
   /// When `null`, reconnects continue indefinitely.
   final int? maxAttempts;
 
-  /// Delay between reconnect attempts.
+  /// Base delay before the first reconnect retry.
+  ///
+  /// Later retries back off exponentially via [backoffMultiplier] and are
+  /// capped by [maxDelay].
   final Duration delay;
+
+  /// Maximum delay used after exponential backoff is applied.
+  final Duration maxDelay;
+
+  /// Multiplier applied to [delay] for each successive retry attempt.
+  final double backoffMultiplier;
 
   const ReconnectPolicy({
     this.maxAttempts,
     this.delay = const Duration(seconds: 2),
-  });
+    this.maxDelay = const Duration(seconds: 30),
+    this.backoffMultiplier = 2,
+  }) : assert(backoffMultiplier >= 1);
+
+  /// Returns the retry delay for the 1-based reconnect [attempt].
+  Duration delayForAttempt(int attempt) {
+    if (attempt <= 1) {
+      return delay > maxDelay ? maxDelay : delay;
+    }
+    var delayMicros = delay.inMicroseconds.toDouble();
+    for (var i = 1; i < attempt; i++) {
+      delayMicros *= backoffMultiplier;
+      if (delayMicros >= maxDelay.inMicroseconds) {
+        return maxDelay;
+      }
+    }
+    final nextDelay = Duration(microseconds: delayMicros.round());
+    return nextDelay > maxDelay ? maxDelay : nextDelay;
+  }
 }
 
 /// Single Redis socket connection with RESP encoding, decoding, and retries.
@@ -269,7 +296,7 @@ class Connection {
     }
     _isReconnecting = true;
     _reconnectAttempts += 1;
-    await Future.delayed(reconnectPolicy.delay);
+    await Future.delayed(reconnectPolicy.delayForAttempt(_reconnectAttempts));
     if (!_shouldReconnect) {
       _isReconnecting = false;
       return;

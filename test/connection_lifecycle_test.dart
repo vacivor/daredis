@@ -6,6 +6,19 @@ import 'package:test/test.dart';
 
 void main() {
   group('Connection lifecycle', () {
+    test('ReconnectPolicy uses exponential backoff capped by maxDelay', () {
+      const policy = ReconnectPolicy(
+        delay: Duration(milliseconds: 100),
+        maxDelay: Duration(milliseconds: 350),
+        backoffMultiplier: 2,
+      );
+
+      expect(policy.delayForAttempt(1), const Duration(milliseconds: 100));
+      expect(policy.delayForAttempt(2), const Duration(milliseconds: 200));
+      expect(policy.delayForAttempt(3), const Duration(milliseconds: 350));
+      expect(policy.delayForAttempt(6), const Duration(milliseconds: 350));
+    });
+
     test('connect is idempotent while a socket is already open', () async {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       final sockets = <Socket>[];
