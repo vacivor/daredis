@@ -60,6 +60,52 @@ void main() {
       await pool.close();
     });
 
+    test('awaits disposal of expired idle items before creating replacements', () async {
+      var nextId = 0;
+      var disposeStarted = false;
+      var disposeFinished = false;
+      final disposeCompleter = Completer<void>();
+
+      final pool = Pool<int>(
+        config: PoolConfig(
+          maxSize: 1,
+          maxIdle: 1,
+          idleTimeout: const Duration(milliseconds: 5),
+          testOnBorrow: false,
+          testOnReturn: false,
+        ),
+        create: () async {
+          if (nextId > 0) {
+            expect(disposeStarted, isTrue);
+            expect(disposeFinished, isTrue);
+          }
+          return ++nextId;
+        },
+        dispose: (item) async {
+          disposeStarted = true;
+          await disposeCompleter.future;
+          disposeFinished = true;
+        },
+      );
+
+      final first = await pool.acquire();
+      await pool.release(first);
+      await Future<void>.delayed(const Duration(milliseconds: 15));
+
+      final secondFuture = pool.acquire();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(disposeStarted, isTrue);
+      expect(disposeFinished, isFalse);
+
+      disposeCompleter.complete();
+      final second = await secondFuture;
+
+      expect(second, isNot(first));
+
+      await pool.release(second);
+      await pool.close();
+    });
+
     test('checked-out items do not accrue idle timeout until released', () async {
       var nextId = 0;
       final disposed = <int>[];

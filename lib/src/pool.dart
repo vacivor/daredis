@@ -210,13 +210,13 @@ class Pool<T> {
         break;
       }
       if (_isIdleExpired(idleItem)) {
-        _disposeItem(idleItem.item); // Dispose expired items immediately.
+        await _disposeItem(idleItem.item);
         continue;
       }
       if (await _isValid(idleItem.item, config.testOnBorrow)) {
         return idleItem.item;
       }
-      _disposeItem(idleItem.item); // Keep looking after scheduling disposal.
+      await _disposeItem(idleItem.item);
     }
 
     // 2. Create a new item if the pool has spare capacity.
@@ -254,8 +254,8 @@ class Pool<T> {
       return;
     }
 
-      if (!await _isValid(item, config.testOnReturn)) {
-        await _disposeItem(item);
+    if (!await _isValid(item, config.testOnReturn)) {
+      await _disposeItem(item);
       _scheduleMaintenance(_serveWaiters()); // Backfill capacity for queued waiters.
       return;
     }

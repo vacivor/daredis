@@ -351,7 +351,7 @@ class Connection {
   Future<dynamic> hello(int version, {String? password, String? username}) {
     return sendCommand([
       'HELLO',
-      version.toString(),
+      version,
       if (password != null) ...['AUTH', username ?? 'default', password],
     ]);
   }
