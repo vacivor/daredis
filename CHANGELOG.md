@@ -1,3 +1,13 @@
+## 0.2.1
+
+### Fixes
+
+- Hardened pub/sub acknowledgement handling so timed-out subscribe and unsubscribe operations do not leave stale waiters or corrupt reconnect replay state.
+- Added exponential reconnect backoff and tightened connection/session error handling for standalone connections, pub/sub sessions, and monitor sessions.
+- Fixed pool disposal ordering and idle maintenance edge cases to avoid silent async failures and cleaner resource turnover.
+- Tightened decoding and normalization paths for server replies, bit operations, and cluster routing errors.
+- Reduced internal duplication and decode overhead in shared server helpers, cluster pipeline handling, and RESP frame processing.
+
 ## 0.2.0
 
 ### Breaking changes
