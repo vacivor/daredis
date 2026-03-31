@@ -304,8 +304,10 @@ class RedisMonitor {
     try {
       await connect();
       _isReconnecting = false;
-    } on DaredisCommandException {
+    } on DaredisCommandException catch (error, stackTrace) {
       _isReconnecting = false;
+      _shouldReconnect = false;
+      Zone.current.handleUncaughtError(error, stackTrace);
     } catch (_) {
       _isReconnecting = false;
       unawaited(_handleReconnect());

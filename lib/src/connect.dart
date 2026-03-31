@@ -268,8 +268,10 @@ class Connection {
     try {
       await connect();
       _isReconnecting = false;
-    } on DaredisCommandException {
+    } on DaredisCommandException catch (error, stackTrace) {
       _isReconnecting = false;
+      _shouldReconnect = false;
+      Zone.current.handleUncaughtError(error, stackTrace);
     } catch (_) {
       _isReconnecting = false;
       unawaited(_handleReconnect());
@@ -281,13 +283,19 @@ class Connection {
     List<dynamic> command, {
     Duration? timeout,
   }) async {
-    if (_socket == null) {
+    final socket = _socket;
+    if (socket == null) {
       throw DaredisConnectionException("Not connected");
     }
-    final encoded = _encoder.encodeCommand(command);
-    _socket!.add(encoded);
     final completer = Completer<dynamic>();
     _completers.add(completer);
+    try {
+      final encoded = _encoder.encodeCommand(command);
+      socket.add(encoded);
+    } catch (error, stackTrace) {
+      _completers.remove(completer);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
 
     final effectiveTimeout = timeout ?? commandTimeout;
     return completer.future.timeout(

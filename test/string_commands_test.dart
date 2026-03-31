@@ -55,6 +55,15 @@ void main() {
       ]);
     });
 
+    test('bitPos requires start when end is provided', () {
+      final executor = _FakeStringExecutor();
+
+      expect(
+        () => executor.bitPos('bits:{1}', 1, end: 8),
+        throwsArgumentError,
+      );
+    });
+
     test('bytes helpers preserve binary payloads', () async {
       final executor = _FakeStringExecutor()
         ..response = Uint8List.fromList([0, 255, 1, 2]);

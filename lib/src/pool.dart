@@ -179,7 +179,7 @@ class Pool<T> {
        _validate = validate,
        config = config ?? PoolConfig() {
     _startEvictionTimer();
-    _ensureMinIdle();
+    _scheduleMaintenance(_ensureMinIdle());
   }
 
   /// Whether the pool has been closed.
@@ -254,9 +254,9 @@ class Pool<T> {
       return;
     }
 
-    if (!await _isValid(item, config.testOnReturn)) {
-      await _disposeItem(item);
-      _serveWaiters(); // Backfill capacity for queued waiters.
+      if (!await _isValid(item, config.testOnReturn)) {
+        await _disposeItem(item);
+      _scheduleMaintenance(_serveWaiters()); // Backfill capacity for queued waiters.
       return;
     }
 
@@ -265,7 +265,7 @@ class Pool<T> {
       final idleItem = _IdleItem(item);
       if (_isIdleExpired(idleItem)) {
         await _disposeItem(item);
-        _serveWaiters();
+        _scheduleMaintenance(_serveWaiters());
         return;
       }
       if (await _isValid(item, config.testOnBorrow)) {
@@ -273,7 +273,7 @@ class Pool<T> {
         return;
       }
       await _disposeItem(item);
-      _serveWaiters();
+      _scheduleMaintenance(_serveWaiters());
       return;
     }
 
@@ -282,11 +282,11 @@ class Pool<T> {
       final idleItem = _IdleItem(item);
       if (_isIdleExpired(idleItem)) {
         await _disposeItem(item);
-        _serveWaiters();
+        _scheduleMaintenance(_serveWaiters());
         return;
       }
       _idle.addLast(idleItem);
-      _ensureMinIdle();
+      _scheduleMaintenance(_ensureMinIdle());
     } else {
       await _disposeItem(item);
     }
@@ -340,7 +340,7 @@ class Pool<T> {
     }
   }
 
-  void _serveWaiters() async {
+  Future<void> _serveWaiters() async {
     if (_closed || _waiters.isEmpty || _isServingWaiters) return;
 
     _isServingWaiters = true;
@@ -441,7 +441,7 @@ class Pool<T> {
     );
   }
 
-  void _ensureMinIdle() async {
+  Future<void> _ensureMinIdle() async {
     if (_isEnsuringMinIdle ||
         _closed ||
         _total >= config.maxSize ||
@@ -467,7 +467,12 @@ class Pool<T> {
   void _startEvictionTimer() {
     if (config.evictionInterval == null) return;
 
-    _evictionTimer = Timer.periodic(config.evictionInterval!, (_) async {
+    _evictionTimer = Timer.periodic(config.evictionInterval!, (_) {
+      _scheduleMaintenance(_runEvictionCycle());
+    });
+  }
+
+  Future<void> _runEvictionCycle() async {
       if (_closed) return;
 
       final now = DateTime.now();
@@ -495,13 +500,20 @@ class Pool<T> {
 
       for (final idleItem in toRemove) {
         if (_idle.remove(idleItem)) {
-          _disposeItem(idleItem.item);
+          await _disposeItem(idleItem.item);
         }
       }
 
-      _ensureMinIdle();
-      _serveWaiters();
-    });
+      await _ensureMinIdle();
+      await _serveWaiters();
+  }
+
+  void _scheduleMaintenance(Future<void> future) {
+    unawaited(
+      future.catchError((Object error, StackTrace stackTrace) {
+        Zone.current.handleUncaughtError(error, stackTrace);
+      }),
+    );
   }
 }
 

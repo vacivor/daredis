@@ -261,6 +261,9 @@ mixin RedisStringCommands on RedisCommandExecutor {
 
   /// Returns the first bit position matching [bit] in [key].
   Future<int> bitPos(String key, int bit, {int? start, int? end}) async {
+    if (end != null && start == null) {
+      throw ArgumentError('BITPOS end requires start');
+    }
     final args = ['BITPOS', key, bit];
     if (start != null) args.add(start);
     if (end != null) args.add(end);

@@ -199,7 +199,7 @@ class RedisPubSub {
   }
 
   void _onError(Object error) {
-    _cleanup();
+    _cleanup(error);
     unawaited(_handleReconnect());
   }
 
@@ -208,15 +208,19 @@ class RedisPubSub {
     unawaited(_handleReconnect());
   }
 
-  void _failPendingAcks([DaredisException? error]) {
-    final exception = error ?? DaredisNetworkException('Connection closed');
+  void _failPendingAcks([Object? error]) {
+    final exception = error is DaredisException
+        ? error
+        : DaredisNetworkException(
+            error == null ? 'Connection closed' : 'Connection error: $error',
+          );
     while (_ackQueue.isNotEmpty) {
       _ackQueue.removeFirst().completer.completeError(exception);
     }
   }
 
-  void _cleanup() {
-    _failPendingAcks();
+  void _cleanup([Object? error]) {
+    _failPendingAcks(error);
     final subscription = _socketSubscription;
     final socket = _socket;
     _socketSubscription = null;
@@ -514,8 +518,10 @@ class RedisPubSub {
     try {
       await connect();
       _isReconnecting = false;
-    } on DaredisCommandException {
+    } on DaredisCommandException catch (error, stackTrace) {
       _isReconnecting = false;
+      _shouldReconnect = false;
+      Zone.current.handleUncaughtError(error, stackTrace);
     } catch (_) {
       _isReconnecting = false;
       unawaited(_handleReconnect());
