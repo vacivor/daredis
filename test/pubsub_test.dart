@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:daredis/daredis.dart';
 import 'package:daredis/src/exceptions.dart';
 import 'package:test/test.dart';
@@ -109,6 +112,117 @@ void main() {
         pubsub.connect(),
         throwsA(isA<DaredisStateException>()),
       );
+    });
+
+    test('subscribe timeout does not replay unacknowledged subscriptions on reconnect', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final commandTexts = <String>[];
+      var connectionCount = 0;
+
+      final serverSubscription = server.listen((socket) {
+        connectionCount += 1;
+        socket.listen((data) {
+          final text = utf8.decode(data, allowMalformed: true);
+          commandTexts.add(text);
+          if (text.contains('confirmed')) {
+            socket.add(
+              '*3\r\n\$9\r\nsubscribe\r\n\$9\r\nconfirmed\r\n:1\r\n'.codeUnits,
+            );
+          }
+        });
+      });
+
+      final pubsub = RedisPubSub(
+        host: InternetAddress.loopbackIPv4.address,
+        port: server.port,
+        commandTimeout: const Duration(milliseconds: 40),
+        reconnectPolicy: const ReconnectPolicy(
+          maxAttempts: 3,
+          delay: Duration(milliseconds: 20),
+        ),
+      );
+
+      await pubsub.connect();
+
+      await expectLater(
+        pubsub.subscribe(['stale']),
+        throwsA(isA<DaredisTimeoutException>()),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await pubsub.subscribe(['confirmed']);
+
+      expect(connectionCount, greaterThanOrEqualTo(2));
+      expect(
+        commandTexts.where((text) => text.contains('stale')),
+        hasLength(1),
+      );
+      expect(
+        commandTexts.where((text) => text.contains('confirmed')),
+        hasLength(1),
+      );
+
+      await pubsub.close();
+      await serverSubscription.cancel();
+      await server.close();
+    });
+
+    test('unsubscribe timeout preserves confirmed subscriptions for reconnect', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final commandTexts = <String>[];
+      var connectionCount = 0;
+
+      final serverSubscription = server.listen((socket) {
+        connectionCount += 1;
+        socket.listen((data) {
+          final text = utf8.decode(data, allowMalformed: true);
+          commandTexts.add(text);
+          if (text.contains('SUBSCRIBE') && text.contains('news')) {
+            socket.add(
+              '*3\r\n\$9\r\nsubscribe\r\n\$4\r\nnews\r\n:1\r\n'.codeUnits,
+            );
+          }
+        });
+      });
+
+      final pubsub = RedisPubSub(
+        host: InternetAddress.loopbackIPv4.address,
+        port: server.port,
+        commandTimeout: const Duration(milliseconds: 40),
+        reconnectPolicy: const ReconnectPolicy(
+          maxAttempts: 3,
+          delay: Duration(milliseconds: 20),
+        ),
+      );
+
+      await pubsub.connect();
+      await pubsub.subscribe(['news']);
+
+      await expectLater(
+        pubsub.unsubscribe(['news']),
+        throwsA(isA<DaredisTimeoutException>()),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(connectionCount, greaterThanOrEqualTo(2));
+      expect(
+        commandTexts.where(
+          (text) => text.contains('\r\nSUBSCRIBE\r\n') && text.contains('news'),
+        ),
+        hasLength(2),
+      );
+      expect(
+        commandTexts.where(
+          (text) =>
+              text.contains('\r\nUNSUBSCRIBE\r\n') && text.contains('news'),
+        ),
+        hasLength(1),
+      );
+
+      await pubsub.close();
+      await serverSubscription.cancel();
+      await server.close();
     });
   });
 }

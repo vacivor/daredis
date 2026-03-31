@@ -354,23 +354,55 @@ class RedisPubSub {
     _socket!.add(encoded);
   }
 
+  Future<void> _sendAckCommand({
+    required List<dynamic> command,
+    required Set<String> ackTypes,
+    required int remaining,
+    required String timeoutMessage,
+    required void Function() onAcknowledged,
+    bool reconnectOnFailure = true,
+  }) async {
+    final waiter = _PubSubAckWaiter(types: ackTypes, remaining: remaining);
+    _ackQueue.add(waiter);
+    try {
+      await _sendCommand(command);
+      await waiter.completer.future.timeout(
+        commandTimeout,
+        onTimeout: () => throw DaredisTimeoutException(timeoutMessage),
+      );
+      _ackQueue.remove(waiter);
+      onAcknowledged();
+    } catch (error) {
+      _ackQueue.remove(waiter);
+      if (reconnectOnFailure) {
+        _resetAfterAckFailure(error);
+      }
+      rethrow;
+    }
+  }
+
+  void _resetAfterAckFailure(Object error) {
+    if (_socket == null) {
+      return;
+    }
+    _cleanup(error);
+    unawaited(_handleReconnect());
+  }
+
   /// Subscribes to one or more channels.
   Future<void> subscribe(List<String> channels) async {
     if (channels.isEmpty) return;
     _ensureOpen();
     await ensureConnected();
-    _channels.addAll(channels);
-    final waiter = _PubSubAckWaiter(
-      types: const {'subscribe'},
+    await _sendAckCommand(
+      command: ['SUBSCRIBE', ...channels],
+      ackTypes: const {'subscribe'},
       remaining: channels.length,
-    );
-    _ackQueue.add(waiter);
-    await _sendCommand(['SUBSCRIBE', ...channels]);
-    await waiter.completer.future.timeout(
-      commandTimeout,
-      onTimeout: () => throw DaredisTimeoutException(
-        'Subscribe timed out after ${commandTimeout.inSeconds}s',
-      ),
+      timeoutMessage:
+          'Subscribe timed out after ${commandTimeout.inSeconds}s',
+      onAcknowledged: () {
+        _channels.addAll(channels);
+      },
     );
   }
 
@@ -379,18 +411,15 @@ class RedisPubSub {
     if (patterns.isEmpty) return;
     _ensureOpen();
     await ensureConnected();
-    _patterns.addAll(patterns);
-    final waiter = _PubSubAckWaiter(
-      types: const {'psubscribe'},
+    await _sendAckCommand(
+      command: ['PSUBSCRIBE', ...patterns],
+      ackTypes: const {'psubscribe'},
       remaining: patterns.length,
-    );
-    _ackQueue.add(waiter);
-    await _sendCommand(['PSUBSCRIBE', ...patterns]);
-    await waiter.completer.future.timeout(
-      commandTimeout,
-      onTimeout: () => throw DaredisTimeoutException(
-        'PSubscribe timed out after ${commandTimeout.inSeconds}s',
-      ),
+      timeoutMessage:
+          'PSubscribe timed out after ${commandTimeout.inSeconds}s',
+      onAcknowledged: () {
+        _patterns.addAll(patterns);
+      },
     );
   }
 
@@ -399,18 +428,15 @@ class RedisPubSub {
     if (shardChannels.isEmpty) return;
     _ensureOpen();
     await ensureConnected();
-    _shardChannels.addAll(shardChannels);
-    final waiter = _PubSubAckWaiter(
-      types: const {'ssubscribe'},
+    await _sendAckCommand(
+      command: ['SSUBSCRIBE', ...shardChannels],
+      ackTypes: const {'ssubscribe'},
       remaining: shardChannels.length,
-    );
-    _ackQueue.add(waiter);
-    await _sendCommand(['SSUBSCRIBE', ...shardChannels]);
-    await waiter.completer.future.timeout(
-      commandTimeout,
-      onTimeout: () => throw DaredisTimeoutException(
-        'SSubscribe timed out after ${commandTimeout.inSeconds}s',
-      ),
+      timeoutMessage:
+          'SSubscribe timed out after ${commandTimeout.inSeconds}s',
+      onAcknowledged: () {
+        _shardChannels.addAll(shardChannels);
+      },
     );
   }
 
@@ -418,22 +444,19 @@ class RedisPubSub {
   Future<void> unsubscribe([List<String> channels = const []]) async {
     _ensureOpen();
     await ensureConnected();
-    if (channels.isEmpty) {
-      _channels.clear();
-    } else {
-      _channels.removeAll(channels);
-    }
-    final waiter = _PubSubAckWaiter(
-      types: const {'unsubscribe'},
+    await _sendAckCommand(
+      command: ['UNSUBSCRIBE', ...channels],
+      ackTypes: const {'unsubscribe'},
       remaining: channels.isEmpty ? 1 : channels.length,
-    );
-    _ackQueue.add(waiter);
-    await _sendCommand(['UNSUBSCRIBE', ...channels]);
-    await waiter.completer.future.timeout(
-      commandTimeout,
-      onTimeout: () => throw DaredisTimeoutException(
-        'Unsubscribe timed out after ${commandTimeout.inSeconds}s',
-      ),
+      timeoutMessage:
+          'Unsubscribe timed out after ${commandTimeout.inSeconds}s',
+      onAcknowledged: () {
+        if (channels.isEmpty) {
+          _channels.clear();
+        } else {
+          _channels.removeAll(channels);
+        }
+      },
     );
   }
 
@@ -441,22 +464,19 @@ class RedisPubSub {
   Future<void> punsubscribe([List<String> patterns = const []]) async {
     _ensureOpen();
     await ensureConnected();
-    if (patterns.isEmpty) {
-      _patterns.clear();
-    } else {
-      _patterns.removeAll(patterns);
-    }
-    final waiter = _PubSubAckWaiter(
-      types: const {'punsubscribe'},
+    await _sendAckCommand(
+      command: ['PUNSUBSCRIBE', ...patterns],
+      ackTypes: const {'punsubscribe'},
       remaining: patterns.isEmpty ? 1 : patterns.length,
-    );
-    _ackQueue.add(waiter);
-    await _sendCommand(['PUNSUBSCRIBE', ...patterns]);
-    await waiter.completer.future.timeout(
-      commandTimeout,
-      onTimeout: () => throw DaredisTimeoutException(
-        'PUnsubscribe timed out after ${commandTimeout.inSeconds}s',
-      ),
+      timeoutMessage:
+          'PUnsubscribe timed out after ${commandTimeout.inSeconds}s',
+      onAcknowledged: () {
+        if (patterns.isEmpty) {
+          _patterns.clear();
+        } else {
+          _patterns.removeAll(patterns);
+        }
+      },
     );
   }
 
@@ -464,22 +484,19 @@ class RedisPubSub {
   Future<void> sunsubscribe([List<String> shardChannels = const []]) async {
     _ensureOpen();
     await ensureConnected();
-    if (shardChannels.isEmpty) {
-      _shardChannels.clear();
-    } else {
-      _shardChannels.removeAll(shardChannels);
-    }
-    final waiter = _PubSubAckWaiter(
-      types: const {'sunsubscribe'},
+    await _sendAckCommand(
+      command: ['SUNSUBSCRIBE', ...shardChannels],
+      ackTypes: const {'sunsubscribe'},
       remaining: shardChannels.isEmpty ? 1 : shardChannels.length,
-    );
-    _ackQueue.add(waiter);
-    await _sendCommand(['SUNSUBSCRIBE', ...shardChannels]);
-    await waiter.completer.future.timeout(
-      commandTimeout,
-      onTimeout: () => throw DaredisTimeoutException(
-        'SUnsubscribe timed out after ${commandTimeout.inSeconds}s',
-      ),
+      timeoutMessage:
+          'SUnsubscribe timed out after ${commandTimeout.inSeconds}s',
+      onAcknowledged: () {
+        if (shardChannels.isEmpty) {
+          _shardChannels.clear();
+        } else {
+          _shardChannels.removeAll(shardChannels);
+        }
+      },
     );
   }
 
@@ -575,8 +592,14 @@ class RedisPubSub {
         remaining: command.length - 1,
       );
       _ackQueue.add(waiter);
-      await _sendCommand(command);
-      await waiter.completer.future.timeout(commandTimeout);
+      try {
+        await _sendCommand(command);
+        await waiter.completer.future.timeout(commandTimeout);
+        _ackQueue.remove(waiter);
+      } catch (_) {
+        _ackQueue.remove(waiter);
+        rethrow;
+      }
     }
   }
 }
