@@ -641,7 +641,7 @@ class ClusterCommandSpec {
     for (final key in keys.skip(1)) {
       final nextSlot = slotCache.slotForKey(key);
       if (nextSlot != slot) {
-        throw RespException(
+        throw DaredisClusterException(
           'CROSSSLOT Keys in request do not hash to the same slot',
         );
       }

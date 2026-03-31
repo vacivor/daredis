@@ -191,14 +191,15 @@ class Connection {
   }
 
   void _tryDecode() {
-    while (_buffer.isNotEmpty) {
-      final currentData = _buffer.toBytes();
+    if (_buffer.isEmpty) {
+      return;
+    }
+    final currentData = _buffer.toBytes();
+    var offset = 0;
+    while (offset < currentData.length) {
       try {
-        final decoded = _decoder.decode(currentData);
-        final consumed = _decoder.consumedBytes;
-        final remaining = currentData.sublist(consumed);
-        _buffer.clear();
-        _buffer.add(remaining);
+        final decoded = _decoder.decode(currentData, offset: offset);
+        offset = _decoder.consumedBytes;
 
         if (decoded is RespPush) {
           final native = respValueToNative(decoded);
@@ -219,9 +220,17 @@ class Connection {
           final completer = _completers.removeAt(0);
           completer.completeError(e);
         }
+        offset = currentData.length;
         _buffer.clear();
-        break;
+        return;
       }
+    }
+    if (offset == 0) {
+      return;
+    }
+    _buffer.clear();
+    if (offset < currentData.length) {
+      _buffer.add(Uint8List.sublistView(currentData, offset));
     }
   }
 

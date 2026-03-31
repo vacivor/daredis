@@ -247,18 +247,18 @@ void main() {
 
       expect(
         () => cluster.mGet([keyA, keyB]),
-        throwsA(isA<RespException>()),
+        throwsA(isA<DaredisClusterException>()),
       );
       expect(
         () => cluster.sInter([setA, setB]),
-        throwsA(isA<RespException>()),
+        throwsA(isA<DaredisClusterException>()),
       );
 
       final pipeline = cluster.pipeline();
       pipeline.add(['MGET', keyA, keyB]);
       expect(
         () => pipeline.execute(),
-        throwsA(isA<RespException>()),
+        throwsA(isA<DaredisClusterException>()),
       );
     });
 
@@ -345,7 +345,7 @@ void main() {
       expect(await tx.sendCommand(['SET', keyB, '2']), 'QUEUED');
       expect(
         () => tx.sendCommand(['MGET', keyA, crossSlotKey]),
-        throwsA(isA<RespException>()),
+        throwsA(isA<DaredisClusterException>()),
       );
       final replies = await tx.exec();
       expect(replies, hasLength(2));

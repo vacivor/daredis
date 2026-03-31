@@ -456,9 +456,9 @@ class RespDecoder {
 
   int get consumedBytes => _offset;
 
-  RespValue? decode(Uint8List data) {
+  RespValue? decode(Uint8List data, {int offset = 0}) {
     _data = data;
-    _offset = 0;
+    _offset = offset;
     return _decodeNext();
   }
 

@@ -51,7 +51,7 @@ class ClusterCommandPolicy {
     for (final key in keys) {
       final nextSlot = slotCache.slotForKey(key);
       if (nextSlot != slot) {
-        throw RespException(
+        throw DaredisClusterException(
           'CROSSSLOT Transaction is pinned to slot $slot but key "$key" '
           'maps to slot $nextSlot',
         );

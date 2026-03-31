@@ -247,14 +247,15 @@ class RedisPubSub {
   }
 
   void _tryDecode() {
-    while (_buffer.isNotEmpty) {
-      final currentData = _buffer.toBytes();
+    if (_buffer.isEmpty) {
+      return;
+    }
+    final currentData = _buffer.toBytes();
+    var offset = 0;
+    while (offset < currentData.length) {
       try {
-        final decoded = _decoder.decode(currentData);
-        final consumed = _decoder.consumedBytes;
-        final remaining = currentData.sublist(consumed);
-        _buffer.clear();
-        _buffer.add(remaining);
+        final decoded = _decoder.decode(currentData, offset: offset);
+        offset = _decoder.consumedBytes;
 
         final native = respValueToNative(decoded);
         if (native is List && native.isNotEmpty) {
@@ -264,8 +265,15 @@ class RedisPubSub {
         break;
       } catch (_) {
         _buffer.clear();
-        break;
+        return;
       }
+    }
+    if (offset == 0) {
+      return;
+    }
+    _buffer.clear();
+    if (offset < currentData.length) {
+      _buffer.add(Uint8List.sublistView(currentData, offset));
     }
   }
 

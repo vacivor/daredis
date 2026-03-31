@@ -483,7 +483,7 @@ void main() {
           'orders:{42}',
           'payments:{7}',
         ], slotCache),
-        throwsA(isA<RespException>()),
+        throwsA(isA<DaredisClusterException>()),
       );
     });
 
