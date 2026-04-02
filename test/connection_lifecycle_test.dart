@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:daredis/daredis.dart';
@@ -133,6 +134,63 @@ void main() {
         throwsA(isA<DaredisCommandException>()),
       );
 
+      await serverSubscription.cancel();
+      for (final socket in sockets) {
+        await socket.close();
+      }
+      await server.close();
+    });
+
+    test('reports terminal reconnect failures via reconnectFailureHandler', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sockets = <Socket>[];
+      final failure = Completer<DaredisException>();
+      var connectionCount = 0;
+
+      final serverSubscription = server.listen((socket) {
+        sockets.add(socket);
+        connectionCount += 1;
+        var responded = false;
+        socket.listen((_) {
+          if (responded) return;
+          responded = true;
+          if (connectionCount == 1) {
+            socket.add('+OK\r\n'.codeUnits);
+            unawaited(
+              Future<void>.delayed(const Duration(milliseconds: 10), socket.close),
+            );
+            return;
+          }
+          socket
+            ..add(
+              '-WRONGPASS invalid username-password pair or user is disabled.\r\n'
+                  .codeUnits,
+            )
+            ..close();
+        });
+      });
+
+      final connection = Connection(
+        host: InternetAddress.loopbackIPv4.address,
+        port: server.port,
+        password: 'secret',
+        reconnectPolicy: const ReconnectPolicy(
+          maxAttempts: 2,
+          delay: Duration(milliseconds: 20),
+        ),
+        reconnectFailureHandler: (error, _) {
+          if (!failure.isCompleted) {
+            failure.complete(error);
+          }
+        },
+      );
+
+      await connection.connect();
+      final error = await failure.future.timeout(const Duration(seconds: 1));
+
+      expect(error, isA<DaredisCommandException>());
+
+      await connection.disconnect();
       await serverSubscription.cancel();
       for (final socket in sockets) {
         await socket.close();

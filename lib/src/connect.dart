@@ -6,6 +6,8 @@ import 'package:daredis/src/exceptions.dart';
 import 'package:daredis/src/resp.dart';
 
 typedef PushMessageHandler = void Function(List<dynamic> message);
+typedef ReconnectFailureHandler =
+    void Function(DaredisException error, StackTrace stackTrace);
 
 /// Controls how a low-level connection retries after the socket closes.
 class ReconnectPolicy {
@@ -79,6 +81,10 @@ class Connection {
   /// Optional handler for RESP3 push frames.
   final PushMessageHandler? pushHandler;
 
+  /// Optional callback invoked when reconnecting gives up because a reconnect
+  /// attempt failed with a terminal Redis command error.
+  final ReconnectFailureHandler? reconnectFailureHandler;
+
   final _decoder = RespDecoder();
   final _encoder = RespEncoder();
   final _completers = <Completer<dynamic>>[];
@@ -100,6 +106,7 @@ class Connection {
     this.useSsl = false,
     this.reconnectPolicy = const ReconnectPolicy(),
     this.pushHandler,
+    this.reconnectFailureHandler,
   });
 
   /// Creates a connection from reusable [ConnectionOptions].
@@ -114,6 +121,7 @@ class Connection {
       useSsl: options.useSsl,
       reconnectPolicy: options.reconnectPolicy,
       pushHandler: options.pushHandler,
+      reconnectFailureHandler: options.reconnectFailureHandler,
     );
   }
 
@@ -147,9 +155,7 @@ class Connection {
       rethrow;
     } catch (e) {
       await _disposeSocket(graceful: true);
-      if (!_isReconnecting) {
-        throw DaredisNetworkException('Failed to connect to $host:$port: $e');
-      }
+      throw DaredisNetworkException('Failed to connect to $host:$port: $e');
     }
   }
 
@@ -307,11 +313,33 @@ class Connection {
     } on DaredisCommandException catch (error, stackTrace) {
       _isReconnecting = false;
       _shouldReconnect = false;
-      Zone.current.handleUncaughtError(error, stackTrace);
-    } catch (_) {
+      _reportReconnectFailure(error, stackTrace);
+    } on DaredisException catch (error, stackTrace) {
       _isReconnecting = false;
+      if (reconnectPolicy.maxAttempts != null &&
+          _reconnectAttempts >= reconnectPolicy.maxAttempts!) {
+        _shouldReconnect = false;
+        _reportReconnectFailure(error, stackTrace);
+        return;
+      }
       unawaited(_handleReconnect());
     }
+  }
+
+  void _reportReconnectFailure(
+    DaredisException error,
+    StackTrace stackTrace,
+  ) {
+    final handler = reconnectFailureHandler;
+    if (handler != null) {
+      try {
+        handler(error, stackTrace);
+        return;
+      } catch (handlerError, handlerStackTrace) {
+        Zone.current.handleUncaughtError(handlerError, handlerStackTrace);
+      }
+    }
+    Zone.current.handleUncaughtError(error, stackTrace);
   }
 
   /// Sends a single Redis command and resolves with the decoded response.
@@ -386,6 +414,10 @@ class ConnectionOptions {
   /// Optional RESP3 push frame handler.
   final PushMessageHandler? pushHandler;
 
+  /// Optional callback invoked when reconnecting gives up because a reconnect
+  /// attempt failed with a terminal Redis command error.
+  final ReconnectFailureHandler? reconnectFailureHandler;
+
   const ConnectionOptions({
     this.host = 'localhost',
     this.port = 6379,
@@ -396,6 +428,7 @@ class ConnectionOptions {
     this.useSsl = false,
     this.reconnectPolicy = const ReconnectPolicy(),
     this.pushHandler,
+    this.reconnectFailureHandler,
   });
 
   /// Returns a copy with the provided fields replaced.
@@ -409,6 +442,7 @@ class ConnectionOptions {
     bool? useSsl,
     ReconnectPolicy? reconnectPolicy,
     PushMessageHandler? pushHandler,
+    ReconnectFailureHandler? reconnectFailureHandler,
   }) {
     return ConnectionOptions(
       host: host ?? this.host,
@@ -420,6 +454,8 @@ class ConnectionOptions {
       useSsl: useSsl ?? this.useSsl,
       reconnectPolicy: reconnectPolicy ?? this.reconnectPolicy,
       pushHandler: pushHandler ?? this.pushHandler,
+      reconnectFailureHandler:
+          reconnectFailureHandler ?? this.reconnectFailureHandler,
     );
   }
 }

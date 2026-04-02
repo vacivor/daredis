@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -222,6 +223,48 @@ void main() {
 
       await pubsub.close();
       await serverSubscription.cancel();
+      await server.close();
+    });
+
+    test('reports terminal reconnect failures via reconnectFailureHandler', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sockets = <Socket>[];
+      final failure = Completer<DaredisException>();
+
+      final serverSubscription = server.listen((socket) {
+        sockets.add(socket);
+        unawaited(
+          Future<void>.delayed(const Duration(milliseconds: 10)).then((_) async {
+            socket.destroy();
+            await server.close();
+          }),
+        );
+      });
+
+      final pubsub = RedisPubSub(
+        host: InternetAddress.loopbackIPv4.address,
+        port: server.port,
+        reconnectPolicy: const ReconnectPolicy(
+          maxAttempts: 2,
+          delay: Duration(milliseconds: 20),
+        ),
+        reconnectFailureHandler: (error, _) {
+          if (!failure.isCompleted) {
+            failure.complete(error);
+          }
+        },
+      );
+
+      await pubsub.connect();
+      final error = await failure.future.timeout(const Duration(seconds: 1));
+
+      expect(error, isA<DaredisNetworkException>());
+
+      await pubsub.close();
+      await serverSubscription.cancel();
+      for (final socket in sockets) {
+        await socket.close();
+      }
       await server.close();
     });
   });

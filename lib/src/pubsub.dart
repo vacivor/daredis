@@ -60,6 +60,10 @@ class RedisPubSub {
   /// Reconnect behavior for the subscription socket.
   final ReconnectPolicy reconnectPolicy;
 
+  /// Optional callback invoked when reconnecting gives up because a reconnect
+  /// attempt failed with a terminal Redis command error.
+  final ReconnectFailureHandler? reconnectFailureHandler;
+
   final _decoder = RespDecoder();
   final _encoder = RespEncoder();
   final _buffer = BytesBuilder();
@@ -84,6 +88,7 @@ class RedisPubSub {
     this.commandTimeout = const Duration(seconds: 30),
     this.useSsl = false,
     this.reconnectPolicy = const ReconnectPolicy(),
+    this.reconnectFailureHandler,
   });
 
   /// Creates a pub/sub session from reusable [ConnectionOptions].
@@ -97,6 +102,7 @@ class RedisPubSub {
       commandTimeout: options.commandTimeout,
       useSsl: options.useSsl,
       reconnectPolicy: options.reconnectPolicy,
+      reconnectFailureHandler: options.reconnectFailureHandler,
     );
   }
 
@@ -172,9 +178,7 @@ class RedisPubSub {
       rethrow;
     } catch (e) {
       await _disposeSocket(graceful: true);
-      if (!_isReconnecting) {
-        throw DaredisNetworkException('Failed to connect to $host:$port: $e');
-      }
+      throw DaredisNetworkException('Failed to connect to $host:$port: $e');
     }
   }
 
@@ -546,11 +550,33 @@ class RedisPubSub {
     } on DaredisCommandException catch (error, stackTrace) {
       _isReconnecting = false;
       _shouldReconnect = false;
-      Zone.current.handleUncaughtError(error, stackTrace);
-    } catch (_) {
+      _reportReconnectFailure(error, stackTrace);
+    } on DaredisException catch (error, stackTrace) {
       _isReconnecting = false;
+      if (reconnectPolicy.maxAttempts != null &&
+          _reconnectAttempts >= reconnectPolicy.maxAttempts!) {
+        _shouldReconnect = false;
+        _reportReconnectFailure(error, stackTrace);
+        return;
+      }
       unawaited(_handleReconnect());
     }
+  }
+
+  void _reportReconnectFailure(
+    DaredisException error,
+    StackTrace stackTrace,
+  ) {
+    final handler = reconnectFailureHandler;
+    if (handler != null) {
+      try {
+        handler(error, stackTrace);
+        return;
+      } catch (handlerError, handlerStackTrace) {
+        Zone.current.handleUncaughtError(handlerError, handlerStackTrace);
+      }
+    }
+    Zone.current.handleUncaughtError(error, stackTrace);
   }
 
   int _parseInt(dynamic value) {

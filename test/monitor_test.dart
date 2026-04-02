@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:daredis/daredis.dart';
@@ -85,6 +86,54 @@ void main() {
         monitor.connect(),
         throwsA(isA<DaredisStateException>()),
       );
+    });
+
+    test('reports terminal reconnect failures via reconnectFailureHandler', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sockets = <Socket>[];
+      final failure = Completer<DaredisException>();
+
+      final serverSubscription = server.listen((socket) {
+        sockets.add(socket);
+        var responded = false;
+        socket.listen((_) {
+          if (responded) return;
+          responded = true;
+          socket.add('+OK\r\n'.codeUnits);
+          unawaited(
+            Future<void>.delayed(const Duration(milliseconds: 10)).then((_) async {
+              socket.destroy();
+              await server.close();
+            }),
+          );
+        });
+      });
+
+      final monitor = RedisMonitor(
+        host: InternetAddress.loopbackIPv4.address,
+        port: server.port,
+        reconnectPolicy: const ReconnectPolicy(
+          maxAttempts: 2,
+          delay: Duration(milliseconds: 20),
+        ),
+        reconnectFailureHandler: (error, _) {
+          if (!failure.isCompleted) {
+            failure.complete(error);
+          }
+        },
+      );
+
+      await monitor.connect();
+      final error = await failure.future.timeout(const Duration(seconds: 1));
+
+      expect(error, isA<DaredisNetworkException>());
+
+      await monitor.close();
+      await serverSubscription.cancel();
+      for (final socket in sockets) {
+        await socket.close();
+      }
+      await server.close();
     });
   });
 }
