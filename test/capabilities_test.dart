@@ -25,7 +25,7 @@ void main() {
       expect(transaction, isA<RedisTransactionSession>());
     });
 
-    test('session openers are exposed as separate capabilities', () {
+    test('session capabilities are exposed as separate markers', () {
       final standalone = Daredis();
       final cluster = DaredisCluster(
         options: const ClusterOptions(

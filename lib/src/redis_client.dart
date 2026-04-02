@@ -35,21 +35,22 @@ abstract class RedisClusterClient extends RedisClient {}
 /// WATCH/MULTI/EXEC command mixins on a pinned connection.
 abstract class RedisTransactionSession extends RedisClient {}
 
-/// Capability interface for clients that can open a dedicated pub/sub session.
-abstract class RedisPubSubCapable {
-  /// Opens a pub/sub session.
-  Future<dynamic> openPubSub();
-}
+/// Marker interface for clients that expose a dedicated pub/sub session API.
+///
+/// Concrete client types define the actual `openPubSub(...)` signature because
+/// standalone and cluster clients accept different configuration parameters.
+abstract class RedisPubSubCapable {}
 
-/// Capability interface for clients that can open a dedicated transaction
-/// session.
-abstract class RedisTransactionCapable {
-  /// Opens a transaction session.
-  Future<dynamic> openTransaction();
-}
+/// Marker interface for clients that expose a dedicated transaction session
+/// API.
+///
+/// Concrete client types define the actual `openTransaction(...)` signature
+/// because standalone and cluster transaction openers have different routing
+/// requirements.
+abstract class RedisTransactionCapable {}
 
-/// Capability interface for clients that can open a dedicated monitor session.
-abstract class RedisMonitorCapable {
-  /// Opens a MONITOR session.
-  Future<dynamic> openMonitor();
-}
+/// Marker interface for clients that expose a dedicated MONITOR session API.
+///
+/// Concrete client types define the actual `openMonitor(...)` signature because
+/// standalone and cluster clients accept different configuration parameters.
+abstract class RedisMonitorCapable {}

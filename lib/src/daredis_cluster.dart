@@ -154,7 +154,6 @@ class DaredisCluster extends RedisClusterClient
     (items) => _router.sendPipeline(items),
   );
 
-  @override
   /// Opens a pub/sub session against a chosen cluster node.
   Future<RedisPubSub> openPubSub({ClusterNode? node}) async {
     if (options.seeds.isEmpty) {
@@ -172,7 +171,6 @@ class DaredisCluster extends RedisClusterClient
     return pubsub;
   }
 
-  @override
   /// Opens a dedicated MONITOR session against a chosen cluster node.
   Future<RedisMonitor> openMonitor({ClusterNode? node}) async {
     if (options.seeds.isEmpty) {

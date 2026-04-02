@@ -125,7 +125,6 @@ class Daredis extends RedisClient
     });
   });
 
-  @override
   /// Opens a dedicated pub/sub session using the client's connection options.
   Future<RedisPubSub> openPubSub({ReconnectPolicy? reconnectPolicy}) async {
     final pubsub = RedisPubSub.fromOptions(
@@ -137,7 +136,6 @@ class Daredis extends RedisClient
     return pubsub;
   }
 
-  @override
   /// Opens a dedicated transaction session on a pinned connection.
   Future<RedisTransaction> openTransaction({
     ReconnectPolicy? reconnectPolicy,
@@ -151,7 +149,6 @@ class Daredis extends RedisClient
     return transaction;
   }
 
-  @override
   /// Opens a dedicated MONITOR session.
   Future<RedisMonitor> openMonitor({ReconnectPolicy? reconnectPolicy}) async {
     final monitor = RedisMonitor.fromOptions(
