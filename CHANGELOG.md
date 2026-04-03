@@ -11,6 +11,9 @@
 ### Improvements
 
 - Lowered the minimum supported Dart SDK from `3.10.7` to `3.8.0` to widen package compatibility without changing the current API surface.
+- Added replica-aware cluster read routing via `ClusterReadPreference.replicaPreferred` for a conservative whitelist of keyed read commands.
+- Added `ClusterRouteObserver` / `ClusterRouteInfo` so applications can observe whether cluster commands were routed to primaries or replicas.
+- Documented the current `replicaPreferred` coverage and clarified the binary-safe contract between raw `sendCommand()` and typed helper APIs.
 
 ## 0.2.0
 

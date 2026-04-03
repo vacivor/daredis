@@ -7,6 +7,13 @@ Future<void> main() async {
         ClusterNode('127.0.0.1', 7000),
       ],
       nodePoolSize: 8,
+      readPreference: ClusterReadPreference.replicaPreferred,
+      routeObserver: (route) {
+        print(
+          'route: ${route.commandName} -> ${route.kind.name} ${route.address}'
+          '${route.key == null ? '' : ' key=${route.key}'}',
+        );
+      },
     ),
   );
 
