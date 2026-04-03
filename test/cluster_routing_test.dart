@@ -414,7 +414,24 @@ void main() {
         isTrue,
       );
       expect(
+        ClusterCommandPolicy.isReadOnly(['SINTERCARD', 2, 'set:{1}', 'set:{1}']),
+        isTrue,
+      );
+      expect(
         ClusterCommandPolicy.isReadOnly(['XPENDING', 'stream:{1}', 'group-a']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'GEOSEARCH',
+          'geo:{1}',
+          'FROMLONLAT',
+          13.0,
+          37.0,
+          'BYRADIUS',
+          100,
+          'km',
+        ]),
         isTrue,
       );
       expect(
@@ -529,6 +546,45 @@ void main() {
       expect(ClusterCommandPolicy.isReadOnly(['ZMPOP']), isFalse);
       expect(ClusterCommandPolicy.isReadOnly(['MEMORY', 'DOCTOR']), isFalse);
       expect(ClusterCommandPolicy.isReadOnly(['JSON.DEBUG', 'HELP']), isFalse);
+    });
+
+    test('replica eligibility requires both read-only semantics and a key', () {
+      expect(
+        ClusterCommandPolicy.isReplicaEligible(['GET', 'user:{1}']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReplicaEligible([
+          'JSON.DEBUG',
+          'MEMORY',
+          'doc:{1}',
+          r'$',
+        ]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReplicaEligible([
+          'TS.QUERYINDEX',
+          'sensor=thermometer',
+        ]),
+        isFalse,
+      );
+      expect(
+        ClusterCommandPolicy.isReplicaEligible([
+          'TS.MGET',
+          'FILTER',
+          'sensor=thermometer',
+        ]),
+        isFalse,
+      );
+      expect(
+        ClusterCommandPolicy.isReplicaEligible(['INFO']),
+        isFalse,
+      );
+      expect(
+        ClusterCommandPolicy.isReplicaEligible(['SET', 'user:{1}', 'v']),
+        isFalse,
+      );
     });
 
     test('only round-robins explicitly safe keyless commands', () {

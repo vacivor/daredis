@@ -748,7 +748,7 @@ class _DaredisClusterConnection extends RedisClusterClient {
           : _stickyPrimaryRoute();
     }
     if (options.readPreference == ClusterReadPreference.replicaPreferred &&
-        ClusterCommandPolicy.isReadOnly(command)) {
+        ClusterCommandPolicy.isReplicaEligible(command, key: key)) {
       return _replicaRouteForKey(key);
     }
     return _primaryRouteForKey(key);

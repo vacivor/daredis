@@ -428,20 +428,25 @@ cluster exposes them. Set `routeObserver` when you want to inspect whether a
 command was routed to a primary or replica node.
 
 Current `replicaPreferred` coverage is intentionally conservative. It applies
-to keyed commands in these groups:
+only when a command resolves to a concrete cluster key. Current coverage
+includes keyed commands in these groups:
 
 - string reads: `GET`, `MGET`, `GETRANGE`, `GETBIT`, `BITCOUNT`, `BITPOS`, `BITFIELD_RO`, `STRLEN`, `DIGEST`, `LCS`
 - key metadata reads: `EXISTS`, `TYPE`, `TTL`, `PTTL`, `EXPIRETIME`, `PEXPIRETIME`, `DUMP`, `OBJECT *`, `MEMORY USAGE`
 - hash reads: `HGET`, `HMGET`, `HGETALL`, `HEXISTS`, `HRANDFIELD`, `HKEYS`, `HVALS`, `HLEN`, `HSTRLEN`, `HSCAN`, `HTTL`, `HPTTL`, `HEXPIRETIME`, `HPEXPIRETIME`
-- list, set, sorted set reads: `LLEN`, `LRANGE`, `LINDEX`, `LPOS`, `SMEMBERS`, `SISMEMBER`, `SMISMEMBER`, `SCARD`, `SRANDMEMBER`, `SDIFF`, `SINTER`, `SUNION`, `SSCAN`, `ZSCORE`, `ZMSCORE`, `ZCARD`, `ZCOUNT`, `ZLEXCOUNT`, `ZRANK`, `ZREVRANK`, `ZRANDMEMBER`, `ZRANGE`, `ZREVRANGE`, `ZRANGEBYSCORE`, `ZREVRANGEBYSCORE`, `ZRANGEBYLEX`, `ZREVRANGEBYLEX`, `ZINTER`, `ZUNION`, `ZDIFF`, `ZINTERCARD`, `ZSCAN`, `SORT` (without `STORE`), `SORT_RO`
+- list, set, sorted set reads: `LLEN`, `LRANGE`, `LINDEX`, `LPOS`, `SMEMBERS`, `SISMEMBER`, `SMISMEMBER`, `SCARD`, `SRANDMEMBER`, `SDIFF`, `SINTER`, `SINTERCARD`, `SUNION`, `SSCAN`, `ZSCORE`, `ZMSCORE`, `ZCARD`, `ZCOUNT`, `ZLEXCOUNT`, `ZRANK`, `ZREVRANK`, `ZRANDMEMBER`, `ZRANGE`, `ZREVRANGE`, `ZRANGEBYSCORE`, `ZREVRANGEBYSCORE`, `ZRANGEBYLEX`, `ZREVRANGEBYLEX`, `ZINTER`, `ZUNION`, `ZDIFF`, `ZINTERCARD`, `ZSCAN`, `SORT` (without `STORE`), `SORT_RO`
 - stream reads: `XLEN`, `XRANGE`, `XREVRANGE`, `XREAD`, `XPENDING`, `XINFO *`
 - geo reads: `GEOHASH`, `GEOPOS`, `GEODIST`, `GEOSEARCH`, `GEORADIUS`, `GEORADIUS_RO`, `GEORADIUSBYMEMBER`, `GEORADIUSBYMEMBER_RO`
-- module reads: `JSON.GET`, `JSON.MGET`, `JSON.TYPE`, `JSON.ARRINDEX`, `JSON.ARRLEN`, `JSON.OBJLEN`, `JSON.OBJKEYS`, `JSON.RESP`, `JSON.STRLEN`, `JSON.DEBUG MEMORY`, `TS.GET`, `TS.INFO`, `TS.RANGE`, `TS.REVRANGE`, `TS.MGET`, `TS.MRANGE`, `TS.MREVRANGE`, `TS.QUERYINDEX`, `TOPK.COUNT`, `TOPK.INFO`, `TOPK.LIST`, `TOPK.QUERY`, `VCARD`, `VDIM`, `VEMB`, `VGETATTR`, `VINFO`, `VISMEMBER`, `VLINKS`, `VRANDMEMBER`, `VRANGE`, `VSIM`
+- module reads: `JSON.GET`, `JSON.MGET`, `JSON.TYPE`, `JSON.ARRINDEX`, `JSON.ARRLEN`, `JSON.OBJLEN`, `JSON.OBJKEYS`, `JSON.RESP`, `JSON.STRLEN`, `JSON.DEBUG MEMORY`, `TS.GET`, `TS.INFO`, `TS.RANGE`, `TS.REVRANGE`, `TOPK.COUNT`, `TOPK.INFO`, `TOPK.LIST`, `TOPK.QUERY`, `VCARD`, `VDIM`, `VEMB`, `VGETATTR`, `VINFO`, `VISMEMBER`, `VLINKS`, `VRANDMEMBER`, `VRANGE`, `VSIM`
 - script/function reads with keys: `EVAL_RO`, `EVALSHA_RO`, `FCALL_RO`
 - HyperLogLog read: `PFCOUNT`
 
 Commands outside this whitelist still route to primaries even when
 `readPreference` is `replicaPreferred`.
+
+Keyless or filter-based reads such as `INFO`, `TS.MGET`, `TS.MRANGE`,
+`TS.MREVRANGE`, and `TS.QUERYINDEX` stay on a stable primary because they do
+not resolve to a single slot.
 
 ```dart
 final cluster = DaredisCluster(

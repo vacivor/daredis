@@ -53,6 +53,7 @@ class ClusterCommandPolicy {
     'SRANDMEMBER',
     'SDIFF',
     'SINTER',
+    'SINTERCARD',
     'SUNION',
     'SSCAN',
     'ZSCORE',
@@ -161,6 +162,17 @@ class ClusterCommandPolicy {
           command[1].toString().toUpperCase() == 'USAGE';
     }
     return false;
+  }
+
+  /// Returns whether [command] is eligible for replica routing.
+  ///
+  /// Replica routing only applies to commands that are both conservatively
+  /// classified as read-only and resolve to a concrete cluster key.
+  static bool isReplicaEligible(
+    List<dynamic> command, {
+    String? key,
+  }) {
+    return (key ?? firstKey(command)) != null && isReadOnly(command);
   }
 
   /// Returns whether a keyless [command] is safe to distribute across primaries.
