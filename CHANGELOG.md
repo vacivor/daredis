@@ -8,6 +8,10 @@
 - Tightened decoding and normalization paths for server replies, bit operations, and cluster routing errors.
 - Reduced internal duplication and decode overhead in shared server helpers, cluster pipeline handling, and RESP frame processing.
 
+### Improvements
+
+- Lowered the minimum supported Dart SDK from `3.10.7` to `3.8.0` to widen package compatibility without changing the current API surface.
+
 ## 0.2.0
 
 ### Breaking changes

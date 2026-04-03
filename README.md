@@ -471,6 +471,19 @@ final cluster = DaredisCluster(
 `sendCommand()` is still available as a low-level escape hatch, but for most
 application code the typed helpers are easier to read and maintain.
 
+### Binary Safety
+
+Raw `sendCommand()` is binary-safe by default. RESP bulk strings are surfaced
+as `Uint8List`, so low-level code can safely work with non-text payloads.
+
+Typed helpers stay semantic by default:
+
+- text and structured helpers such as `get()`, `hGetAll()`, `zRange()`, and `xRange()` decode replies into `String`, numbers, maps, or typed models
+- binary-safe variants are exposed with `*Bytes` when preserving payload bytes matters, such as `getBytes()`, `mGetBytes()`, `dumpBytes()`, `hGetBytes()`, `lRangeBytes()`, `sMembersBytes()`, `zRangeBytes()`, and `xRangeBytes()`
+
+This keeps the raw protocol layer lossless without forcing every application
+call site to manually decode UTF-8.
+
 ### Command Metadata
 
 ```dart

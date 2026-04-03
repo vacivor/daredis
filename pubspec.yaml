@@ -6,7 +6,7 @@ homepage: https://github.com/vacivor/daredis
 issue_tracker: https://github.com/vacivor/daredis/issues
 
 environment:
-  sdk: ^3.10.7
+  sdk: ^3.8.0
 
 # Add regular dependencies here.
 dependencies:
