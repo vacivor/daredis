@@ -17,6 +17,7 @@ class ClusterCommandPolicy {
     'BITCOUNT',
     'BITPOS',
     'BITFIELD_RO',
+    'DIGEST',
     'LCS',
     'SUBSTR',
     'MGET',
@@ -36,6 +37,7 @@ class ClusterCommandPolicy {
     'HVALS',
     'HLEN',
     'HSTRLEN',
+    'HSCAN',
     'HTTL',
     'HPTTL',
     'HEXPIRETIME',
@@ -76,6 +78,7 @@ class ClusterCommandPolicy {
     'XRANGE',
     'XREVRANGE',
     'XREAD',
+    'XPENDING',
     'GEOHASH',
     'GEOPOS',
     'GEODIST',
@@ -88,7 +91,8 @@ class ClusterCommandPolicy {
     'JSON.ARRLEN',
     'JSON.OBJLEN',
     'JSON.OBJKEYS',
-    'JSON.DEBUG',
+    'JSON.RESP',
+    'JSON.STRLEN',
     'TS.GET',
     'TS.INFO',
     'TS.RANGE',
@@ -114,6 +118,7 @@ class ClusterCommandPolicy {
     'PFCOUNT',
     'SORT_RO',
     'EVAL_RO',
+    'EVALSHA_RO',
     'FCALL_RO',
     'XINFO',
     'OBJECT',
@@ -138,6 +143,19 @@ class ClusterCommandPolicy {
     if (_readOnlyCommands.contains(cmd)) {
       return true;
     }
+    if (cmd == 'GEORADIUS' || cmd == 'GEORADIUSBYMEMBER') {
+      return !_containsAnyOption(command, const {'STORE', 'STOREDIST'});
+    }
+    if (cmd == 'SORT') {
+      return !_containsAnyOption(command, const {'STORE'});
+    }
+    if (cmd == 'JSON.DEBUG') {
+      return command.length > 1 &&
+          command[1].toString().toUpperCase() == 'MEMORY';
+    }
+    if (cmd == 'JSON.ARRINDEX') {
+      return true;
+    }
     if (cmd == 'MEMORY') {
       return command.length > 1 &&
           command[1].toString().toUpperCase() == 'USAGE';
@@ -153,6 +171,18 @@ class ClusterCommandPolicy {
     if (command.isEmpty) return false;
     final cmd = command.first.toString().toUpperCase();
     return _roundRobinKeylessCommands.contains(cmd);
+  }
+
+  static bool _containsAnyOption(
+    List<dynamic> command,
+    Set<String> options,
+  ) {
+    for (final part in command.skip(1)) {
+      if (options.contains(part.toString().toUpperCase())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Ensures [command] uses a registered cluster key specification.

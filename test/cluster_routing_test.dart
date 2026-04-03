@@ -383,13 +383,59 @@ void main() {
 
     test('classifies conservative replica-safe read commands', () {
       expect(ClusterCommandPolicy.isReadOnly(['GET', 'user:{1}']), isTrue);
+      expect(ClusterCommandPolicy.isReadOnly(['DIGEST', 'user:{1}']), isTrue);
       expect(
         ClusterCommandPolicy.isReadOnly(['JSON.GET', 'doc:{1}', r'$']),
         isTrue,
       );
       expect(
+        ClusterCommandPolicy.isReadOnly(['JSON.RESP', 'doc:{1}', r'$']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly(['JSON.STRLEN', 'doc:{1}', r'$']),
+        isTrue,
+      );
+      expect(
         ClusterCommandPolicy.isReadOnly(['FCALL_RO', 'fn', 1, 'k:{1}']),
         isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'EVALSHA_RO',
+          'deadbeef',
+          1,
+          'k:{1}',
+        ]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly(['HSCAN', 'hash:{1}', 0]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly(['XPENDING', 'stream:{1}', 'group-a']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'SORT',
+          'items:{1}',
+          'BY',
+          'weight:*',
+        ]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'SORT',
+          'items:{1}',
+          'BY',
+          'weight:*',
+          'STORE',
+          'dest:{1}',
+        ]),
+        isFalse,
       );
       expect(
         ClusterCommandPolicy.isReadOnly([
@@ -403,6 +449,52 @@ void main() {
         isTrue,
       );
       expect(
+        ClusterCommandPolicy.isReadOnly([
+          'GEORADIUS',
+          'geo:{1}',
+          13.0,
+          37.0,
+          100,
+          'km',
+        ]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'GEORADIUSBYMEMBER',
+          'geo:{1}',
+          'palermo',
+          100,
+          'km',
+        ]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'GEORADIUS',
+          'geo:{1}',
+          13.0,
+          37.0,
+          100,
+          'km',
+          'STORE',
+          'dest:{1}',
+        ]),
+        isFalse,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'GEORADIUSBYMEMBER',
+          'geo:{1}',
+          'palermo',
+          100,
+          'km',
+          'STOREDIST',
+          'dest:{1}',
+        ]),
+        isFalse,
+      );
+      expect(
         ClusterCommandPolicy.isReadOnly(['XINFO', 'STREAM', 'stream:{1}']),
         isTrue,
       );
@@ -414,10 +506,29 @@ void main() {
         ClusterCommandPolicy.isReadOnly(['MEMORY', 'USAGE', 'key:{1}']),
         isTrue,
       );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'JSON.DEBUG',
+          'MEMORY',
+          'doc:{1}',
+          r'$',
+        ]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'JSON.ARRINDEX',
+          'doc:{1}',
+          r'$.items',
+          '"needle"',
+        ]),
+        isTrue,
+      );
       expect(ClusterCommandPolicy.isReadOnly(['SET', 'user:{1}', 'v']), isFalse);
       expect(ClusterCommandPolicy.isReadOnly(['XREADGROUP']), isFalse);
       expect(ClusterCommandPolicy.isReadOnly(['ZMPOP']), isFalse);
       expect(ClusterCommandPolicy.isReadOnly(['MEMORY', 'DOCTOR']), isFalse);
+      expect(ClusterCommandPolicy.isReadOnly(['JSON.DEBUG', 'HELP']), isFalse);
     });
 
     test('only round-robins explicitly safe keyless commands', () {
