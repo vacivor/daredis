@@ -32,20 +32,32 @@ class ClusterNodeAddress {
 
 /// In-memory slot-to-node mapping built from `CLUSTER SLOTS` responses.
 class ClusterSlotCache {
-  final List<ClusterNodeAddress?> _slots = List<ClusterNodeAddress?>.filled(
+  final List<_ClusterSlotOwners?> _slots = List<_ClusterSlotOwners?>.filled(
     _clusterSlotCount,
     null,
   );
 
   /// Returns the node responsible for [slot], or `null` when unknown.
   ClusterNodeAddress? nodeForSlot(int slot) {
+    return primaryForSlot(slot);
+  }
+
+  /// Returns the primary node responsible for [slot], or `null` when unknown.
+  ClusterNodeAddress? primaryForSlot(int slot) {
     if (slot < 0 || slot >= _clusterSlotCount) return null;
-    return _slots[slot];
+    return _slots[slot]?.primary;
   }
 
   /// Returns the node responsible for [key], or `null` when unknown.
   ClusterNodeAddress? nodeForKey(String key) {
     return nodeForSlot(slotForKey(key));
+  }
+
+  /// Returns the replica nodes responsible for [slot], or an empty list when
+  /// no replica metadata is available.
+  List<ClusterNodeAddress> replicasForSlot(int slot) {
+    if (slot < 0 || slot >= _clusterSlotCount) return const [];
+    return _slots[slot]?.replicas ?? const [];
   }
 
   /// Computes the Redis Cluster slot for [key], including hash tag handling.
@@ -57,7 +69,7 @@ class ClusterSlotCache {
   /// Updates the owner of [slot] to [node].
   void updateSlot(int slot, ClusterNodeAddress node) {
     if (slot < 0 || slot >= _clusterSlotCount) return;
-    _slots[slot] = node;
+    _slots[slot] = _ClusterSlotOwners(primary: node);
   }
 
   /// Replaces slot mappings using a raw `CLUSTER SLOTS` [response].
@@ -73,9 +85,23 @@ class ClusterSlotCache {
       if (masterInfo is! List || masterInfo.length < 2) continue;
       final host = Decoders.string(masterInfo[0]);
       final port = _parseInt(masterInfo[1]);
-      final node = ClusterNodeAddress(host, port);
+      final primary = ClusterNodeAddress(host, port);
+      final replicas = <ClusterNodeAddress>[];
+      for (final replicaInfo in entry.skip(3)) {
+        if (replicaInfo is! List || replicaInfo.length < 2) continue;
+        replicas.add(
+          ClusterNodeAddress(
+            Decoders.string(replicaInfo[0]),
+            _parseInt(replicaInfo[1]),
+          ),
+        );
+      }
+      final owners = _ClusterSlotOwners(
+        primary: primary,
+        replicas: List<ClusterNodeAddress>.unmodifiable(replicas),
+      );
       for (var slot = start; slot <= end; slot++) {
-        updateSlot(slot, node);
+        _slots[slot] = owners;
       }
     }
   }
@@ -83,10 +109,41 @@ class ClusterSlotCache {
   /// Returns the distinct nodes currently referenced by the slot table.
   Iterable<ClusterNodeAddress> uniqueNodes() {
     final nodes = <ClusterNodeAddress>{};
-    for (final node in _slots) {
-      if (node != null) nodes.add(node);
+    for (final owners in _slots) {
+      if (owners == null) continue;
+      nodes.add(owners.primary);
+      nodes.addAll(owners.replicas);
     }
     return nodes;
+  }
+
+  /// Returns the distinct primary nodes currently referenced by the slot table.
+  Iterable<ClusterNodeAddress> uniquePrimaryNodes() {
+    final nodes = <ClusterNodeAddress>{};
+    for (final owners in _slots) {
+      if (owners != null) nodes.add(owners.primary);
+    }
+    return nodes;
+  }
+
+  /// Returns the distinct replica nodes currently referenced by the slot table.
+  Iterable<ClusterNodeAddress> uniqueReplicaNodes() {
+    final nodes = <ClusterNodeAddress>{};
+    for (final owners in _slots) {
+      if (owners == null) continue;
+      nodes.addAll(owners.replicas);
+    }
+    return nodes;
+  }
+
+  /// Whether [address] currently appears in replica metadata.
+  bool isReplicaAddress(ClusterNodeAddress address) {
+    for (final owners in _slots) {
+      if (owners != null && owners.replicas.contains(address)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Whether no slots have been populated yet.
@@ -104,6 +161,16 @@ class ClusterSlotCache {
     if (value is int) return value;
     return Decoders.toInt(value);
   }
+}
+
+class _ClusterSlotOwners {
+  final ClusterNodeAddress primary;
+  final List<ClusterNodeAddress> replicas;
+
+  const _ClusterSlotOwners({
+    required this.primary,
+    this.replicas = const [],
+  });
 }
 
 /// Converts a raw Redis key representation to a Dart string.

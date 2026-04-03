@@ -197,5 +197,63 @@ void main() {
       }
       await server.close();
     });
+
+    test('connectionSetup runs on initial connect and reconnect', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sockets = <Socket>[];
+      final received = <String>[];
+      var connectionCount = 0;
+      final setupCount = Completer<void>();
+
+      final serverSubscription = server.listen((socket) {
+        sockets.add(socket);
+        connectionCount += 1;
+        var requestCount = 0;
+        socket.listen((data) {
+          final text = String.fromCharCodes(data);
+          received.add(text);
+          requestCount += 1;
+          socket.add('+OK\r\n'.codeUnits);
+          if (requestCount == 1 && connectionCount == 1) {
+            unawaited(
+              Future<void>.delayed(const Duration(milliseconds: 10), socket.close),
+            );
+          }
+          if (received.where((entry) => entry.contains('CLIENT')).length >= 2 &&
+              !setupCount.isCompleted) {
+            setupCount.complete();
+          }
+        });
+      });
+
+      final connection = Connection(
+        host: InternetAddress.loopbackIPv4.address,
+        port: server.port,
+        reconnectPolicy: const ReconnectPolicy(
+          maxAttempts: 2,
+          delay: Duration(milliseconds: 20),
+        ),
+        connectionSetup: (connection) => connection.sendCommand([
+          'CLIENT',
+          'SETNAME',
+          'daredis-test',
+        ]),
+      );
+
+      await connection.connect();
+      await setupCount.future.timeout(const Duration(seconds: 1));
+
+      expect(
+        received.where((entry) => entry.contains('CLIENT')).length,
+        2,
+      );
+
+      await connection.disconnect();
+      await serverSubscription.cancel();
+      for (final socket in sockets) {
+        await socket.close();
+      }
+      await server.close();
+    });
   });
 }

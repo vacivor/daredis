@@ -7,11 +7,152 @@ import 'package:daredis/src/exceptions.dart';
 /// This keeps cluster-specific semantics concentrated in the routing layer
 /// instead of spreading them across individual command helpers.
 class ClusterCommandPolicy {
+  static const Set<String> _readOnlyCommands = {
+    'PING',
+    'ECHO',
+    'GET',
+    'STRLEN',
+    'GETRANGE',
+    'GETBIT',
+    'BITCOUNT',
+    'BITPOS',
+    'BITFIELD_RO',
+    'LCS',
+    'SUBSTR',
+    'MGET',
+    'EXISTS',
+    'TYPE',
+    'TTL',
+    'PTTL',
+    'EXPIRETIME',
+    'PEXPIRETIME',
+    'DUMP',
+    'HGET',
+    'HMGET',
+    'HGETALL',
+    'HEXISTS',
+    'HRANDFIELD',
+    'HKEYS',
+    'HVALS',
+    'HLEN',
+    'HSTRLEN',
+    'HTTL',
+    'HPTTL',
+    'HEXPIRETIME',
+    'HPEXPIRETIME',
+    'LLEN',
+    'LRANGE',
+    'LINDEX',
+    'LPOS',
+    'SMEMBERS',
+    'SISMEMBER',
+    'SMISMEMBER',
+    'SCARD',
+    'SRANDMEMBER',
+    'SDIFF',
+    'SINTER',
+    'SUNION',
+    'SSCAN',
+    'ZSCORE',
+    'ZMSCORE',
+    'ZCARD',
+    'ZCOUNT',
+    'ZLEXCOUNT',
+    'ZRANK',
+    'ZREVRANK',
+    'ZRANDMEMBER',
+    'ZRANGE',
+    'ZREVRANGE',
+    'ZRANGEBYSCORE',
+    'ZREVRANGEBYSCORE',
+    'ZRANGEBYLEX',
+    'ZREVRANGEBYLEX',
+    'ZINTER',
+    'ZUNION',
+    'ZDIFF',
+    'ZINTERCARD',
+    'ZSCAN',
+    'XLEN',
+    'XRANGE',
+    'XREVRANGE',
+    'XREAD',
+    'GEOHASH',
+    'GEOPOS',
+    'GEODIST',
+    'GEOSEARCH',
+    'GEORADIUS_RO',
+    'GEORADIUSBYMEMBER_RO',
+    'JSON.GET',
+    'JSON.MGET',
+    'JSON.TYPE',
+    'JSON.ARRLEN',
+    'JSON.OBJLEN',
+    'JSON.OBJKEYS',
+    'JSON.DEBUG',
+    'TS.GET',
+    'TS.INFO',
+    'TS.RANGE',
+    'TS.REVRANGE',
+    'TS.MGET',
+    'TS.MRANGE',
+    'TS.MREVRANGE',
+    'TS.QUERYINDEX',
+    'TOPK.COUNT',
+    'TOPK.INFO',
+    'TOPK.LIST',
+    'TOPK.QUERY',
+    'VCARD',
+    'VDIM',
+    'VEMB',
+    'VGETATTR',
+    'VINFO',
+    'VISMEMBER',
+    'VLINKS',
+    'VRANDMEMBER',
+    'VRANGE',
+    'VSIM',
+    'PFCOUNT',
+    'SORT_RO',
+    'EVAL_RO',
+    'FCALL_RO',
+    'XINFO',
+    'OBJECT',
+  };
+
+  static const Set<String> _roundRobinKeylessCommands = {
+    'PING',
+    'ECHO',
+  };
+
   /// Returns whether [command] has a registered cluster key specification.
   static bool hasKnownSpec(List<dynamic> command) {
     if (command.isEmpty) return false;
     final cmd = command.first.toString().toUpperCase();
     return ClusterCommandSpec.specs.containsKey(cmd);
+  }
+
+  /// Returns whether [command] is known to be read-only for routing purposes.
+  static bool isReadOnly(List<dynamic> command) {
+    if (command.isEmpty) return false;
+    final cmd = command.first.toString().toUpperCase();
+    if (_readOnlyCommands.contains(cmd)) {
+      return true;
+    }
+    if (cmd == 'MEMORY') {
+      return command.length > 1 &&
+          command[1].toString().toUpperCase() == 'USAGE';
+    }
+    return false;
+  }
+
+  /// Returns whether a keyless [command] is safe to distribute across primaries.
+  ///
+  /// Most keyless commands stay on a stable primary because their effects or
+  /// observations can be node-local in Redis Cluster (for example `SCRIPT`).
+  static bool canRoundRobinKeyless(List<dynamic> command) {
+    if (command.isEmpty) return false;
+    final cmd = command.first.toString().toUpperCase();
+    return _roundRobinKeylessCommands.contains(cmd);
   }
 
   /// Ensures [command] uses a registered cluster key specification.

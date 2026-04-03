@@ -381,6 +381,55 @@ void main() {
       );
     });
 
+    test('classifies conservative replica-safe read commands', () {
+      expect(ClusterCommandPolicy.isReadOnly(['GET', 'user:{1}']), isTrue);
+      expect(
+        ClusterCommandPolicy.isReadOnly(['JSON.GET', 'doc:{1}', r'$']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly(['FCALL_RO', 'fn', 1, 'k:{1}']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly([
+          'GEORADIUS_RO',
+          'geo:{1}',
+          13.0,
+          37.0,
+          100,
+          'km',
+        ]),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly(['XINFO', 'STREAM', 'stream:{1}']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly(['OBJECT', 'ENCODING', 'key:{1}']),
+        isTrue,
+      );
+      expect(
+        ClusterCommandPolicy.isReadOnly(['MEMORY', 'USAGE', 'key:{1}']),
+        isTrue,
+      );
+      expect(ClusterCommandPolicy.isReadOnly(['SET', 'user:{1}', 'v']), isFalse);
+      expect(ClusterCommandPolicy.isReadOnly(['XREADGROUP']), isFalse);
+      expect(ClusterCommandPolicy.isReadOnly(['ZMPOP']), isFalse);
+      expect(ClusterCommandPolicy.isReadOnly(['MEMORY', 'DOCTOR']), isFalse);
+    });
+
+    test('only round-robins explicitly safe keyless commands', () {
+      expect(ClusterCommandPolicy.canRoundRobinKeyless(['PING']), isTrue);
+      expect(ClusterCommandPolicy.canRoundRobinKeyless(['ECHO', 'hi']), isTrue);
+      expect(
+        ClusterCommandPolicy.canRoundRobinKeyless(['SCRIPT', 'EXISTS', 'sha']),
+        isFalse,
+      );
+      expect(ClusterCommandPolicy.canRoundRobinKeyless(['INFO']), isFalse);
+    });
+
     test('extracts keys from function calls and zrangestore', () {
       expect(
         ClusterCommandSpec.extractKeys([

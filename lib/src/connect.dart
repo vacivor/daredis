@@ -6,6 +6,7 @@ import 'package:daredis/src/exceptions.dart';
 import 'package:daredis/src/resp.dart';
 
 typedef PushMessageHandler = void Function(List<dynamic> message);
+typedef ConnectionSetupHandler = FutureOr<void> Function(Connection connection);
 typedef ReconnectFailureHandler =
     void Function(DaredisException error, StackTrace stackTrace);
 
@@ -81,6 +82,10 @@ class Connection {
   /// Optional handler for RESP3 push frames.
   final PushMessageHandler? pushHandler;
 
+  /// Optional setup callback invoked after authentication on every successful
+  /// socket connect and reconnect.
+  final ConnectionSetupHandler? connectionSetup;
+
   /// Optional callback invoked when reconnecting gives up because a reconnect
   /// attempt failed with a terminal Redis command error.
   final ReconnectFailureHandler? reconnectFailureHandler;
@@ -106,6 +111,7 @@ class Connection {
     this.useSsl = false,
     this.reconnectPolicy = const ReconnectPolicy(),
     this.pushHandler,
+    this.connectionSetup,
     this.reconnectFailureHandler,
   });
 
@@ -121,6 +127,7 @@ class Connection {
       useSsl: options.useSsl,
       reconnectPolicy: options.reconnectPolicy,
       pushHandler: options.pushHandler,
+      connectionSetup: options.connectionSetup,
       reconnectFailureHandler: options.reconnectFailureHandler,
     );
   }
@@ -149,6 +156,7 @@ class Connection {
           await sendCommand(['AUTH', password!]);
         }
       }
+      await connectionSetup?.call(this);
       _reconnectAttempts = 0;
     } on DaredisException {
       await _disposeSocket(graceful: true);
@@ -414,6 +422,10 @@ class ConnectionOptions {
   /// Optional RESP3 push frame handler.
   final PushMessageHandler? pushHandler;
 
+  /// Optional setup callback invoked after authentication on every successful
+  /// socket connect and reconnect.
+  final ConnectionSetupHandler? connectionSetup;
+
   /// Optional callback invoked when reconnecting gives up because a reconnect
   /// attempt failed with a terminal Redis command error.
   final ReconnectFailureHandler? reconnectFailureHandler;
@@ -428,6 +440,7 @@ class ConnectionOptions {
     this.useSsl = false,
     this.reconnectPolicy = const ReconnectPolicy(),
     this.pushHandler,
+    this.connectionSetup,
     this.reconnectFailureHandler,
   });
 
@@ -442,6 +455,7 @@ class ConnectionOptions {
     bool? useSsl,
     ReconnectPolicy? reconnectPolicy,
     PushMessageHandler? pushHandler,
+    ConnectionSetupHandler? connectionSetup,
     ReconnectFailureHandler? reconnectFailureHandler,
   }) {
     return ConnectionOptions(
@@ -454,6 +468,7 @@ class ConnectionOptions {
       useSsl: useSsl ?? this.useSsl,
       reconnectPolicy: reconnectPolicy ?? this.reconnectPolicy,
       pushHandler: pushHandler ?? this.pushHandler,
+      connectionSetup: connectionSetup ?? this.connectionSetup,
       reconnectFailureHandler:
           reconnectFailureHandler ?? this.reconnectFailureHandler,
     );

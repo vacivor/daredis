@@ -8,19 +8,44 @@ void main() {
       final cache = ClusterSlotCache();
 
       cache.updateFromSlotsResponse([
-        [0, 8191, ['127.0.0.1', 7000]],
+        [
+          0,
+          8191,
+          ['127.0.0.1', 7000],
+          ['127.0.0.1', 8000],
+        ],
         [8192, 16383, ['127.0.0.1', 7001]],
       ]);
 
       expect(cache.nodeForSlot(0), const ClusterNodeAddress('127.0.0.1', 7000));
       expect(
+        cache.primaryForSlot(0),
+        const ClusterNodeAddress('127.0.0.1', 7000),
+      );
+      expect(cache.replicasForSlot(0), [
+        const ClusterNodeAddress('127.0.0.1', 8000),
+      ]);
+      expect(
         cache.nodeForSlot(16383),
         const ClusterNodeAddress('127.0.0.1', 7001),
       );
-      expect(cache.uniqueNodes().toSet(), {
+      expect(cache.replicasForSlot(16383), isEmpty);
+      expect(cache.uniquePrimaryNodes().toSet(), {
         const ClusterNodeAddress('127.0.0.1', 7000),
         const ClusterNodeAddress('127.0.0.1', 7001),
       });
+      expect(cache.uniqueReplicaNodes().toSet(), {
+        const ClusterNodeAddress('127.0.0.1', 8000),
+      });
+      expect(cache.uniqueNodes().toSet(), {
+        const ClusterNodeAddress('127.0.0.1', 7000),
+        const ClusterNodeAddress('127.0.0.1', 7001),
+        const ClusterNodeAddress('127.0.0.1', 8000),
+      });
+      expect(
+        cache.isReplicaAddress(const ClusterNodeAddress('127.0.0.1', 8000)),
+        isTrue,
+      );
     });
 
     test('nodeForKey respects hash tags', () {

@@ -105,10 +105,17 @@ Future<void> main() async {
   final cluster = DaredisCluster(
     options: ClusterOptions(
       seeds: const [
-        ClusterNode('127.0.0.1', 7000),
-        ClusterNode('127.0.0.1', 7001),
-      ],
+      ClusterNode('127.0.0.1', 7000),
+      ClusterNode('127.0.0.1', 7001),
+    ],
       nodePoolSize: 8,
+      readPreference: ClusterReadPreference.replicaPreferred,
+      routeObserver: (route) {
+        print(
+          '${route.commandName} -> ${route.kind.name} ${route.address}'
+          '${route.key == null ? '' : ' key=${route.key}'}',
+        );
+      },
     ),
   );
 
@@ -415,7 +422,26 @@ Recommended production-style defaults:
 
 Cluster keeps one connection pool per discovered Redis node.
 Routing stays inside the cluster client, so `nodePoolSize` directly controls
-the per-node concurrency budget.
+the per-node concurrency budget. Set `readPreference` when you want keyed
+read-only commands such as `GET` and `HGET` to prefer replica nodes when the
+cluster exposes them. Set `routeObserver` when you want to inspect whether a
+command was routed to a primary or replica node.
+
+Current `replicaPreferred` coverage is intentionally conservative. It applies
+to keyed commands in these groups:
+
+- string reads: `GET`, `MGET`, `GETRANGE`, `GETBIT`, `BITCOUNT`, `BITPOS`, `BITFIELD_RO`, `STRLEN`, `LCS`
+- key metadata reads: `EXISTS`, `TYPE`, `TTL`, `PTTL`, `EXPIRETIME`, `PEXPIRETIME`, `DUMP`, `OBJECT *`, `MEMORY USAGE`
+- hash reads: `HGET`, `HMGET`, `HGETALL`, `HEXISTS`, `HRANDFIELD`, `HKEYS`, `HVALS`, `HLEN`, `HSTRLEN`, `HTTL`, `HPTTL`, `HEXPIRETIME`, `HPEXPIRETIME`
+- list, set, sorted set reads: `LLEN`, `LRANGE`, `LINDEX`, `LPOS`, `SMEMBERS`, `SISMEMBER`, `SMISMEMBER`, `SCARD`, `SRANDMEMBER`, `SDIFF`, `SINTER`, `SUNION`, `SSCAN`, `ZSCORE`, `ZMSCORE`, `ZCARD`, `ZCOUNT`, `ZLEXCOUNT`, `ZRANK`, `ZREVRANK`, `ZRANDMEMBER`, `ZRANGE`, `ZREVRANGE`, `ZRANGEBYSCORE`, `ZREVRANGEBYSCORE`, `ZRANGEBYLEX`, `ZREVRANGEBYLEX`, `ZINTER`, `ZUNION`, `ZDIFF`, `ZINTERCARD`, `ZSCAN`
+- stream reads: `XLEN`, `XRANGE`, `XREVRANGE`, `XREAD`, `XINFO *`
+- geo reads: `GEOHASH`, `GEOPOS`, `GEODIST`, `GEOSEARCH`, `GEORADIUS_RO`, `GEORADIUSBYMEMBER_RO`
+- module reads: `JSON.GET`, `JSON.MGET`, `JSON.TYPE`, `JSON.ARRLEN`, `JSON.OBJLEN`, `JSON.OBJKEYS`, `JSON.DEBUG MEMORY`, `TS.GET`, `TS.INFO`, `TS.RANGE`, `TS.REVRANGE`, `TS.MGET`, `TS.MRANGE`, `TS.MREVRANGE`, `TS.QUERYINDEX`, `TOPK.COUNT`, `TOPK.INFO`, `TOPK.LIST`, `TOPK.QUERY`, `VCARD`, `VDIM`, `VEMB`, `VGETATTR`, `VINFO`, `VISMEMBER`, `VLINKS`, `VRANDMEMBER`, `VRANGE`, `VSIM`
+- script/function reads with keys: `EVAL_RO`, `FCALL_RO`
+- HyperLogLog read: `PFCOUNT`
+
+Commands outside this whitelist still route to primaries even when
+`readPreference` is `replicaPreferred`.
 
 ```dart
 final cluster = DaredisCluster(
@@ -432,6 +458,10 @@ final cluster = DaredisCluster(
     poolCreateMaxAttempts: 3,
     poolCreateRetryDelay: const Duration(milliseconds: 100),
     poolUseLifo: true,
+    readPreference: ClusterReadPreference.replicaPreferred,
+    routeObserver: (route) {
+      print('${route.commandName} -> ${route.kind.name} ${route.address}');
+    },
   ),
 );
 ```

@@ -70,6 +70,76 @@ void main() {
       expect(await cluster.hGet(hashKey, 'field-a'), '1');
     });
 
+    test('replicaPreferred read routing preserves basic read and write behavior', timeout: integrationTestTimeout, () async {
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
+      }
+      final replicaPreferred = DaredisCluster(
+        options: const ClusterOptions(
+          seeds: [ClusterNode(clusterHost, clusterPort)],
+          readPreference: ClusterReadPreference.replicaPreferred,
+        ),
+      );
+      final tag = '{${testKey('cluster-read-pref')}}';
+      final key = 'daredis:test:cluster:readpref:$tag';
+
+      addTearDown(() => deleteKeys(cluster, [key]));
+      addTearDown(() async => replicaPreferred.close());
+
+      await replicaPreferred.connect();
+
+      expect(await replicaPreferred.set(key, 'replica-preferred'), isTrue);
+      expect(await replicaPreferred.get(key), 'replica-preferred');
+    });
+
+    test('routeObserver reports primary and read routes', timeout: integrationTestTimeout, () async {
+      if (skipIfUnavailable(
+        available,
+        'Redis Cluster is not reachable at $clusterHost:$clusterPort',
+      )) {
+        return;
+      }
+      final routes = <ClusterRouteInfo>[];
+      final observedCluster = DaredisCluster(
+        options: ClusterOptions(
+          seeds: const [ClusterNode(clusterHost, clusterPort)],
+          readPreference: ClusterReadPreference.replicaPreferred,
+          routeObserver: routes.add,
+        ),
+      );
+      final tag = '{${testKey('cluster-route-observer')}}';
+      final key = 'daredis:test:cluster:route-observer:$tag';
+
+      addTearDown(() => deleteKeys(cluster, [key]));
+      addTearDown(() async => observedCluster.close());
+
+      await observedCluster.connect();
+
+      expect(await observedCluster.set(key, 'observed'), isTrue);
+      expect(await observedCluster.get(key), 'observed');
+      expect(await observedCluster.ping(), anyOf('PONG', 'OK'));
+
+      final setRoute = routes.firstWhere((route) => route.commandName == 'SET');
+      expect(setRoute.key, key);
+      expect(setRoute.kind, ClusterRouteKind.primary);
+      expect(setRoute.address.host, isNotEmpty);
+      expect(setRoute.address.port, greaterThan(0));
+
+      final getRoute = routes.firstWhere((route) => route.commandName == 'GET');
+      expect(getRoute.key, key);
+      expect(
+        getRoute.kind,
+        anyOf(ClusterRouteKind.primary, ClusterRouteKind.replica),
+      );
+
+      final pingRoute = routes.firstWhere((route) => route.commandName == 'PING');
+      expect(pingRoute.key, isNull);
+      expect(pingRoute.kind, ClusterRouteKind.primary);
+    });
+
     test('pipeline executes commands in the same slot', timeout: integrationTestTimeout, () async {
       if (skipIfUnavailable(
         available,

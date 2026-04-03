@@ -17,6 +17,57 @@ class ClusterNode {
   const ClusterNode(this.host, this.port);
 }
 
+/// Read routing policy used by [DaredisCluster] for keyed read-only commands.
+enum ClusterReadPreference {
+  /// Always route reads to the primary owner for the slot.
+  primaryOnly,
+
+  /// Prefer replica nodes when slot metadata exposes them, otherwise fall back
+  /// to the primary owner.
+  replicaPreferred,
+}
+
+/// Final routing target chosen for a cluster command attempt.
+enum ClusterRouteKind {
+  /// The command was sent to the slot primary.
+  primary,
+
+  /// The command was sent to a replica.
+  replica,
+}
+
+/// Observable routing information for one cluster command attempt.
+class ClusterRouteInfo {
+  /// Uppercase Redis command name, such as `GET` or `SET`.
+  final String commandName;
+
+  /// First extracted routing key when the command is keyed.
+  final String? key;
+
+  /// Node address selected for this attempt.
+  final ClusterNodeAddress address;
+
+  /// Whether the selected node is a primary or replica.
+  final ClusterRouteKind kind;
+
+  /// Zero-based attempt index for retries and redirects.
+  final int attempt;
+
+  const ClusterRouteInfo({
+    required this.commandName,
+    required this.address,
+    required this.kind,
+    required this.attempt,
+    this.key,
+  });
+
+  /// Whether this send was a retry rather than the first attempt.
+  bool get isRetry => attempt > 0;
+}
+
+/// Observer callback invoked whenever a cluster command is routed.
+typedef ClusterRouteObserver = void Function(ClusterRouteInfo route);
+
 /// Configuration for [DaredisCluster].
 class ClusterOptions {
   /// Seed nodes used to fetch initial slot metadata.
@@ -61,6 +112,12 @@ class ClusterOptions {
   /// Optional reconnect policy override for node connections.
   final ReconnectPolicy? reconnectPolicy;
 
+  /// Read routing preference for keyed read-only commands.
+  final ClusterReadPreference readPreference;
+
+  /// Optional observer invoked for every routed cluster command attempt.
+  final ClusterRouteObserver? routeObserver;
+
   const ClusterOptions({
     required this.seeds,
     this.connectionOptions = const ConnectionOptions(),
@@ -76,6 +133,8 @@ class ClusterOptions {
     this.maxRetries = 3,
     this.retryDelay = const Duration(milliseconds: 50),
     this.reconnectPolicy,
+    this.readPreference = ClusterReadPreference.primaryOnly,
+    this.routeObserver,
   });
 }
 
@@ -291,7 +350,10 @@ class _DaredisClusterConnection extends RedisClusterClient {
   final bool testOnReturn;
   final ClusterSlotCache _slotCache = ClusterSlotCache();
   final Map<ClusterNodeAddress, Pool<Connection>> _pools = {};
+  final Map<ClusterNodeAddress, Pool<Connection>> _replicaPools = {};
   late final PoolConfig _nodePoolConfig;
+  int _keylessPoolIndex = 0;
+  int _replicaPoolIndex = 0;
   bool _connected = false;
   bool _closed = false;
 
@@ -439,7 +501,11 @@ class _DaredisClusterConnection extends RedisClusterClient {
     for (final pool in _pools.values) {
       await pool.close();
     }
+    for (final pool in _replicaPools.values) {
+      await pool.close();
+    }
     _pools.clear();
+    _replicaPools.clear();
   }
 
   @override
@@ -494,12 +560,25 @@ class _DaredisClusterConnection extends RedisClusterClient {
     required int attempt,
   }) async {
     final key = ClusterCommandPolicy.firstKey(command);
-    final pool = key == null ? _anyPool() : _poolForKey(key);
+    final route = _routeForCommand(command, key: key);
+    _notifyRoute(command, route, key: key, attempt: attempt);
     try {
-      return await pool.withResource(
+      return await route.pool.withResource(
         (connection) => connection.sendCommand(command, timeout: timeout),
       );
     } catch (error) {
+      if (route.usesReplica && key != null && error is DaredisException) {
+        final primaryRoute = _primaryRouteForKey(key);
+        _notifyRoute(command, primaryRoute, key: key, attempt: attempt);
+        try {
+          return await primaryRoute.pool.withResource(
+            (connection) => connection.sendCommand(command, timeout: timeout),
+          );
+        } catch (_) {
+          // Fall through to the normal retry/redirect handling using the
+          // original error from the replica attempt.
+        }
+      }
       if (isRetryableClusterError(error) && attempt < options.maxRetries) {
         await Future.delayed(options.retryDelay);
         return _sendWithRedirect(
@@ -522,10 +601,22 @@ class _DaredisClusterConnection extends RedisClusterClient {
       if (redirect.isMoved) {
         _slotCache.updateSlot(redirect.slot, redirect.address);
         await _refreshSlots(hint: redirect.address);
-        return redirectPool.withResource(
+        final refreshedRoute = _routeForCommand(command, key: key);
+        _notifyRoute(command, refreshedRoute, key: key, attempt: attempt + 1);
+        return refreshedRoute.pool.withResource(
           (connection) => connection.sendCommand(command, timeout: timeout),
         );
       }
+      _notifyRoute(
+        command,
+        _ClusterRouteTarget(
+          redirectPool,
+          address: redirect.address,
+          kind: ClusterRouteKind.primary,
+        ),
+        key: key,
+        attempt: attempt + 1,
+      );
       return redirectPool.withResource((connection) async {
         await connection.sendCommand(['ASKING']);
         return connection.sendCommand(command, timeout: timeout);
@@ -534,30 +625,153 @@ class _DaredisClusterConnection extends RedisClusterClient {
   }
 
   void _buildPoolsFromSlots() {
-    for (final node in _slotCache.uniqueNodes()) {
+    for (final node in _slotCache.uniquePrimaryNodes()) {
       _pools.putIfAbsent(node, () => _createNodePool(_optionsForAddress(node)));
     }
   }
 
-  Pool<Connection> _anyPool() {
-    if (_pools.isEmpty) {
+  _ClusterRouteTarget _stickyPrimaryRoute() {
+    final primaryNodes = _slotCache.uniquePrimaryNodes().toList(growable: false);
+    if (primaryNodes.isNotEmpty) {
+      final address = primaryNodes.first;
+      return _ClusterRouteTarget(
+        _poolForAddress(address),
+        address: address,
+        kind: ClusterRouteKind.primary,
+      );
+    }
+
+    final entries = _pools.entries.toList(growable: false);
+    if (entries.isEmpty) {
       throw DaredisConnectionException('Cluster pools are not initialized');
     }
-    return _pools.values.first;
+    return _ClusterRouteTarget(
+      entries.first.value,
+      address: entries.first.key,
+      kind: ClusterRouteKind.primary,
+    );
   }
 
-  Pool<Connection> _poolForKey(String key) {
-    final node = _slotCache.nodeForKey(key);
-    if (node == null) {
-      return _anyPool();
+  Pool<Connection> _anyPool() {
+    final primaryNodes = _slotCache.uniquePrimaryNodes().toList(growable: false);
+    if (primaryNodes.isNotEmpty) {
+      final index = _keylessPoolIndex % primaryNodes.length;
+      _keylessPoolIndex += 1;
+      return _poolForAddress(primaryNodes[index]);
     }
-    return _poolForAddress(node);
+
+    final fallbackPools = _pools.values.toList(growable: false);
+    if (fallbackPools.isEmpty) {
+      throw DaredisConnectionException('Cluster pools are not initialized');
+    }
+    final index = _keylessPoolIndex % fallbackPools.length;
+    _keylessPoolIndex += 1;
+    return fallbackPools[index];
+  }
+
+  _ClusterRouteTarget _roundRobinPrimaryRoute() {
+    final primaryNodes = _slotCache.uniquePrimaryNodes().toList(growable: false);
+    if (primaryNodes.isNotEmpty) {
+      final index = _keylessPoolIndex % primaryNodes.length;
+      final address = primaryNodes[index];
+      _keylessPoolIndex += 1;
+      return _ClusterRouteTarget(
+        _poolForAddress(address),
+        address: address,
+        kind: ClusterRouteKind.primary,
+      );
+    }
+
+    final entries = _pools.entries.toList(growable: false);
+    if (entries.isEmpty) {
+      throw DaredisConnectionException('Cluster pools are not initialized');
+    }
+    final index = _keylessPoolIndex % entries.length;
+    _keylessPoolIndex += 1;
+    return _ClusterRouteTarget(
+      entries[index].value,
+      address: entries[index].key,
+      kind: ClusterRouteKind.primary,
+    );
   }
 
   Pool<Connection> _poolForAddress(ClusterNodeAddress address) {
     return _pools.putIfAbsent(
       address,
       () => _createNodePool(_optionsForAddress(address)),
+    );
+  }
+
+  _ClusterRouteTarget _primaryRouteForKey(String key) {
+    final node = _slotCache.nodeForKey(key);
+    if (node == null) {
+      return _stickyPrimaryRoute();
+    }
+    return _ClusterRouteTarget(
+      _poolForAddress(node),
+      address: node,
+      kind: ClusterRouteKind.primary,
+    );
+  }
+
+  Pool<Connection> _poolForReplicaAddress(ClusterNodeAddress address) {
+    return _replicaPools.putIfAbsent(
+      address,
+      () => _createReplicaPool(_optionsForReplicaAddress(address)),
+    );
+  }
+
+  _ClusterRouteTarget _replicaRouteForKey(String key) {
+    final slot = _slotCache.slotForKey(key);
+    final replicas = _slotCache.replicasForSlot(slot);
+    if (replicas.isEmpty) {
+      return _primaryRouteForKey(key);
+    }
+    final index = _replicaPoolIndex % replicas.length;
+    final address = replicas[index];
+    _replicaPoolIndex += 1;
+    return _ClusterRouteTarget(
+      _poolForReplicaAddress(address),
+      address: address,
+      kind: ClusterRouteKind.replica,
+      usesReplica: true,
+    );
+  }
+
+  _ClusterRouteTarget _routeForCommand(
+    List<dynamic> command, {
+    required String? key,
+  }) {
+    if (key == null) {
+      return ClusterCommandPolicy.canRoundRobinKeyless(command)
+          ? _roundRobinPrimaryRoute()
+          : _stickyPrimaryRoute();
+    }
+    if (options.readPreference == ClusterReadPreference.replicaPreferred &&
+        ClusterCommandPolicy.isReadOnly(command)) {
+      return _replicaRouteForKey(key);
+    }
+    return _primaryRouteForKey(key);
+  }
+
+  void _notifyRoute(
+    List<dynamic> command,
+    _ClusterRouteTarget route, {
+    required String? key,
+    required int attempt,
+  }) {
+    final observer = options.routeObserver;
+    if (observer == null || route.address == null) {
+      return;
+    }
+    observer(
+      ClusterRouteInfo(
+        commandName: command.first.toString().toUpperCase(),
+        key: key,
+        address: route.address!,
+        kind: route.kind,
+        attempt: attempt,
+      ),
     );
   }
 
@@ -619,6 +833,28 @@ class _DaredisClusterConnection extends RedisClusterClient {
     );
   }
 
+  Pool<Connection> _createReplicaPool(ConnectionOptions options) {
+    return Pool<Connection>(
+      config: _nodePoolConfig,
+      create: () async {
+        final connection = Connection.fromOptions(options);
+        await connection.connect();
+        return connection;
+      },
+      dispose: (connection) => connection.disconnect(),
+      validate: (connection) async {
+        try {
+          await connection.ensureConnected();
+          final res = await connection.sendCommand(['PING']);
+          final text = Decoders.toStringOrNull(res);
+          return text == 'PONG' || text == 'OK';
+        } catch (_) {
+          return false;
+        }
+      },
+    );
+  }
+
   ConnectionOptions _optionsForAddress(ClusterNodeAddress address) {
     return options.connectionOptions.copyWith(
       host: address.host,
@@ -626,6 +862,17 @@ class _DaredisClusterConnection extends RedisClusterClient {
       reconnectPolicy:
           options.reconnectPolicy ??
           options.connectionOptions.reconnectPolicy,
+    );
+  }
+
+  ConnectionOptions _optionsForReplicaAddress(ClusterNodeAddress address) {
+    final base = _optionsForAddress(address);
+    final userSetup = base.connectionSetup;
+    return base.copyWith(
+      connectionSetup: (connection) async {
+        await connection.sendCommand(['READONLY']);
+        await userSetup?.call(connection);
+      },
     );
   }
 
@@ -650,6 +897,20 @@ class _DaredisClusterConnection extends RedisClusterClient {
     }
   }
 
+}
+
+class _ClusterRouteTarget {
+  final Pool<Connection> pool;
+  final ClusterNodeAddress? address;
+  final ClusterRouteKind kind;
+  final bool usesReplica;
+
+  const _ClusterRouteTarget(
+    this.pool, {
+    this.address,
+    this.kind = ClusterRouteKind.primary,
+    this.usesReplica = false,
+  });
 }
 
 class ClusterPipeline extends RedisPipeline {
