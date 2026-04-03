@@ -1,3 +1,30 @@
+## 0.3.0
+
+### Breaking changes
+
+- Narrowed the session capability interfaces to marker-only traits so their abstract API no longer advertises opener methods with misleading `dynamic` signatures.
+
+### Improvements
+
+- Added explicit reconnect terminal-failure hooks for connections, pub/sub sessions, and monitor sessions via `ConnectionOptions.reconnectFailureHandler`.
+- Added observable replica-aware cluster routing with `ClusterReadPreference.replicaPreferred`, `ClusterRouteObserver`, and `ClusterRouteInfo`.
+- Expanded and tightened conservative replica routing for keyed read commands, including arg-sensitive handling for commands such as `SORT`, `GEORADIUS`, and `JSON.DEBUG`.
+- Clarified replica eligibility semantics so only keyed read commands participate in replica routing, while keyless or filter-based reads stay on stable primaries.
+- Lowered the minimum supported Dart SDK from `3.10.7` to `3.8.0` to widen package compatibility without changing the current API surface.
+
+### Fixes
+
+- Hardened pub/sub acknowledgement handling so timed-out subscribe and unsubscribe operations do not leave stale waiters or corrupt reconnect replay state.
+- Added exponential reconnect backoff and tightened connection/session error handling for standalone connections, pub/sub sessions, and monitor sessions.
+- Fixed pool disposal ordering and idle maintenance edge cases to avoid silent async failures and cleaner resource turnover.
+- Tightened decoding and normalization paths for server replies, bit operations, and cluster routing errors.
+- Reduced internal duplication and decode overhead in shared server helpers, cluster pipeline handling, and RESP frame processing.
+
+### Docs
+
+- Documented the current `replicaPreferred` coverage and clarified the binary-safe contract between raw `sendCommand()` and typed helper APIs.
+- Refreshed changelog and examples to match the new cluster routing and observability features.
+
 ## 0.2.1
 
 ### Fixes
